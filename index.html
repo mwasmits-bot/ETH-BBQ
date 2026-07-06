@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETH Scorito BBQ — Weekprijzen Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pitch:#123B2A;
+    --pitch-deep:#0C2B1F;
+    --pitch-card:#17482F;
+    --chalk:#F2EFE6;
+    --chalk-dim:rgba(242,239,230,.62);
+    --line:rgba(242,239,230,.16);
+    --amber:#FFB300;
+    --amber-soft:rgba(255,179,0,.14);
+    --red:#E05548;
+    --red-soft:rgba(224,85,72,.14);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--pitch-deep)}
+  body{
+    font-family:'Barlow',sans-serif;color:var(--chalk);
+    background:
+      radial-gradient(1200px 500px at 50% -200px, rgba(255,179,0,.07), transparent 60%),
+      repeating-linear-gradient(90deg, var(--pitch-deep) 0 120px, #0E2F22 120px 240px);
+    min-height:100vh;
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:28px 18px 80px}
+
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    border-bottom:2px solid var(--line);padding-bottom:18px;margin-bottom:22px}
+  .kicker{font-family:'Barlow Condensed';font-weight:600;letter-spacing:.22em;text-transform:uppercase;
+    font-size:13px;color:var(--amber)}
+  h1{font-family:'Barlow Condensed';font-weight:800;text-transform:uppercase;font-size:clamp(34px,6vw,54px);
+    line-height:.95;letter-spacing:.01em}
+  .header-rechts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .season-chip{font-family:'Barlow Condensed';font-weight:700;font-size:18px;letter-spacing:.08em;
+    border:1.5px solid var(--line);border-radius:999px;padding:7px 16px;color:var(--chalk-dim)}
+  .admin-knop{font-family:'Barlow Condensed';font-weight:700;font-size:15px;letter-spacing:.1em;text-transform:uppercase;
+    background:transparent;border:1.5px solid var(--line);border-radius:999px;padding:8px 16px;color:var(--chalk-dim);cursor:pointer;transition:.15s}
+  .admin-knop:hover{color:var(--chalk);border-color:var(--chalk-dim)}
+  .admin-knop.ingelogd{border-color:var(--amber);color:var(--amber)}
+
+  .prijzenkast{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:26px}
+  .prijs{background:var(--pitch-card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 16px 14px}
+  .prijs .icoon{font-size:22px}
+  .prijs .label{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.14em;font-size:13px;color:var(--chalk-dim);margin:6px 0 8px}
+  .prijs .houder{font-family:'Barlow Condensed';font-weight:800;font-size:26px;line-height:1.05;text-transform:uppercase}
+  .prijs .sub{font-size:13px;color:var(--chalk-dim);margin-top:4px}
+  .prijs.goud{border-color:rgba(255,179,0,.45)}
+  .prijs.goud .houder{color:var(--amber)}
+  .prijs.rood .houder{color:var(--red)}
+
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .tab{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:15px;
+    background:transparent;color:var(--chalk-dim);border:1.5px solid var(--line);border-radius:999px;
+    padding:9px 20px;cursor:pointer;transition:.15s}
+  .tab:hover{color:var(--chalk)}
+  .tab.actief{background:var(--amber);border-color:var(--amber);color:#1C1607}
+  .tab:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .tab.verborgen{display:none}
+
+  section.paneel{display:none}
+  section.paneel.actief{display:block}
+
+  .card{background:var(--pitch-card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+  h2{font-family:'Barlow Condensed';font-weight:800;text-transform:uppercase;font-size:24px;letter-spacing:.04em;margin-bottom:12px}
+  h3{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;font-size:17px;letter-spacing:.08em;color:var(--chalk-dim);margin-bottom:10px}
+  p.uitleg{color:var(--chalk-dim);font-size:14.5px;line-height:1.55;margin-bottom:14px}
+
+  .dropzone{border:2px dashed rgba(242,239,230,.35);border-radius:var(--radius);padding:28px 20px;text-align:center;cursor:pointer;transition:.15s}
+  .dropzone:hover,.dropzone.over{border-color:var(--amber);background:var(--amber-soft)}
+  .dropzone .groot{font-family:'Barlow Condensed';font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.06em}
+  .dropzone .klein{color:var(--chalk-dim);font-size:13.5px;margin-top:6px}
+  .preview{max-width:100%;max-height:220px;border-radius:10px;margin:14px auto 0;display:block;border:1px solid var(--line)}
+
+  button.actie{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:16px;
+    background:var(--amber);color:#1C1607;border:none;border-radius:10px;padding:12px 26px;cursor:pointer;transition:.15s}
+  button.actie:hover{filter:brightness(1.08)}
+  button.actie:disabled{opacity:.45;cursor:not-allowed}
+  button.stil{background:transparent;color:var(--chalk);border:1.5px solid var(--line)}
+  button.gevaar{background:transparent;color:var(--red);border:1.5px solid rgba(224,85,72,.5)}
+  button.mini{font-size:13px;padding:8px 16px}
+  .knoppenrij{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+  .status{margin-top:14px;font-size:14px;padding:11px 14px;border-radius:10px;display:none}
+  .status.zichtbaar{display:block}
+  .status.info{background:var(--amber-soft);color:var(--amber)}
+  .status.fout{background:var(--red-soft);color:var(--red)}
+  .laden{display:inline-block;width:14px;height:14px;border:2px solid var(--amber);border-top-color:transparent;border-radius:50%;
+    animation:spin .8s linear infinite;vertical-align:-2px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.laden{animation:none}}
+
+  .rondekop{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+  .rondekop label,label.veld{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:14px;color:var(--chalk-dim)}
+  .telt-toggle{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;
+    border:1.5px solid var(--line);border-radius:10px;padding:9px 14px}
+  .telt-toggle input{width:17px;height:17px;accent-color:var(--amber);cursor:pointer}
+  .telt-toggle span{font-size:14px}
+  input[type=number],input[type=text],input[type=password],input[type=email],select{
+    background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);
+    font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px;width:100%}
+  input[type=number]{width:90px;font-family:'Barlow Condensed';font-weight:700;font-size:18px;text-align:center}
+  select{cursor:pointer;appearance:auto}
+  input:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
+  table.editor{width:100%;border-collapse:collapse}
+  table.editor td{padding:5px 6px 5px 0}
+  table.editor td.smal{width:44px;text-align:center}
+  table.editor th{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:12px;color:var(--chalk-dim);text-align:left;padding:4px 6px 4px 0}
+  .positie-label{font-size:13px;color:var(--chalk-dim);white-space:nowrap}
+  .positie-label.onbekend{color:var(--red)}
+  .rij-x{background:none;border:none;color:var(--chalk-dim);font-size:18px;cursor:pointer;padding:6px 10px;border-radius:8px}
+  .rij-x:hover{color:var(--red);background:var(--red-soft)}
+
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:720px){.duo{grid-template-columns:1fr}}
+  table.stand{width:100%;border-collapse:collapse;font-size:15px}
+  table.stand th{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:13px;
+    color:var(--chalk-dim);text-align:left;padding:8px 10px;border-bottom:1.5px solid var(--line)}
+  table.stand td{padding:9px 10px;border-bottom:1px solid var(--line)}
+  table.stand tr:last-child td{border-bottom:none}
+  table.stand td.num{font-family:'Barlow Condensed';font-weight:800;font-size:20px;text-align:right}
+  .p1 td{background:var(--amber-soft)}
+  .p1 td:first-child{border-left:3px solid var(--amber)}
+  .rood-lijst .p1 td{background:var(--red-soft)}
+  .rood-lijst .p1 td:first-child{border-left:3px solid var(--red)}
+  .pos{font-family:'Barlow Condensed';font-weight:700;color:var(--chalk-dim);width:34px}
+
+  .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.matrix{border-collapse:collapse;font-size:14px;min-width:100%}
+  table.matrix th,table.matrix td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+  table.matrix th{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:13px;color:var(--chalk-dim)}
+  table.matrix th.rnd.klikbaar{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+  table.matrix th.rnd.klikbaar:hover{color:var(--amber)}
+  table.matrix td:first-child,table.matrix th:first-child{text-align:left;position:sticky;left:0;background:var(--pitch-card)}
+  td.hoog{color:var(--amber);font-weight:700;background:var(--amber-soft);border-radius:6px}
+  td.laag{color:var(--red);font-weight:700;background:var(--red-soft);border-radius:6px}
+  th.telt-niet,td.telt-niet{opacity:.4;font-style:italic}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--chalk-dim)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .dot.a{background:var(--amber)} .dot.r{background:var(--red)}
+  .dot.g{background:rgba(242,239,230,.3)}
+
+  .leeg{color:var(--chalk-dim);font-size:14.5px;padding:8px 0}
+
+  .tipkaart{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--pitch-deep)}
+  .tipkop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .tipnaam{font-family:'Barlow Condensed';font-weight:800;font-size:22px;text-transform:uppercase}
+  .gemist{font-family:'Barlow Condensed';font-weight:800;font-size:22px;color:var(--red)}
+  .gemist.nul{color:var(--amber)}
+  .linie{font-size:14px;line-height:1.8}
+  .linie b{font-family:'Barlow Condensed';font-weight:700;color:var(--chalk-dim);text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
+  .aanvoerder{color:var(--amber);font-size:14px;margin-top:6px}
+  .waarschuwing{color:var(--red);font-size:13.5px;margin-top:8px}
+
+  /* hall of fame */
+  .hof-rij{display:grid;grid-template-columns:110px 1fr 1fr;gap:14px;align-items:center;
+    border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--pitch-deep)}
+  @media (max-width:640px){.hof-rij{grid-template-columns:1fr;text-align:left}}
+  .hof-seizoen{font-family:'Barlow Condensed';font-weight:800;font-size:24px;color:var(--chalk-dim)}
+  .hof-persoon{display:flex;align-items:center;gap:12px}
+  .hof-avatar{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--line);flex-shrink:0}
+  .hof-avatar.goud{border-color:var(--amber)}
+  .hof-avatar.rood{border-color:var(--red)}
+  .hof-initialen{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:#14251C;flex-shrink:0}
+  .hof-naam{font-family:'Barlow Condensed';font-weight:800;font-size:20px;text-transform:uppercase;line-height:1.05}
+  .hof-rol{font-size:12.5px;color:var(--chalk-dim)}
+  .hof-acties{grid-column:1 / -1;display:flex;gap:8px}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+  .overlay.open{display:flex}
+  .modal{background:var(--pitch-card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;max-width:380px;width:100%}
+  .modal h2{margin-bottom:6px}
+  .modal p{color:var(--chalk-dim);font-size:14px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="kicker">Scorito · Vriendenpoule</div>
+      <h1>ETH Scorito BBQ</h1>
+    </div>
+    <div class="header-rechts">
+      <div class="season-chip">Seizoen 2026 / 27</div>
+      <button class="admin-knop" id="btnAdmin">🔒 Admin</button>
+    </div>
+  </header>
+
+  <div class="prijzenkast" id="prijzenkast"></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab actief" data-doel="p-standen">Standen</button>
+    <button class="tab" data-doel="p-weken">Weekoverzicht</button>
+    <button class="tab" data-doel="p-hof">Hall of Fame</button>
+    <button class="tab verborgen adm" data-doel="p-upload">Ronde toevoegen</button>
+    <button class="tab verborgen adm" data-doel="p-teams">Selecties</button>
+    <button class="tab verborgen adm" data-doel="p-tips">Mail-tips</button>
+    <button class="tab verborgen adm" data-doel="p-instellingen">Instellingen</button>
+  </nav>
+
+  <!-- ============ STANDEN ============ -->
+  <section class="paneel actief" id="p-standen">
+    <div class="card">
+      <h2>📈 Positieverloop</h2>
+      <p class="uitleg">De tussenstand van de reguliere Scorito-competitie na elke speelronde: wie stond er wanneer bovenaan? Positie 1 is de bovenste lijn.</p>
+      <div class="scrollx" id="chartHouder"></div>
+    </div>
+    <div class="duo">
+      <div class="card">
+        <h2>⚡ Hoogste weekscore</h2>
+        <p class="uitleg">Het seizoensrecord: de allerhoogste weekscore van alle spelers in alle weken. Wordt het record verbroken, dan gaat de prijs naar de nieuwe recordhouder.</p>
+        <div id="standHoog"></div>
+      </div>
+      <div class="card rood-lijst">
+        <h2>📋 Laagste weekscore</h2>
+        <p class="uitleg">Het anti-record: de allerlaagste weekscore van alle spelers in alle weken. Scoort iemand nóg lager, dan neemt die de opdracht over.</p>
+        <div id="standLaag"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Totaalklassement</h2>
+      <p class="uitleg">Optelsom van alle meetellende weekscores — ter controle naast de Scorito-stand.</p>
+      <div id="standTotaal"></div>
+    </div>
+  </section>
+
+  <!-- ============ WEEKOVERZICHT ============ -->
+  <section class="paneel" id="p-weken">
+    <div class="card">
+      <h2>Weekoverzicht</h2>
+      <p class="uitleg" id="matrixUitleg">Alle scores per speelronde.</p>
+      <div class="scrollx" id="matrixHouder"></div>
+      <div class="legend">
+        <span><span class="dot a"></span>Hoogste van die week</span>
+        <span><span class="dot r"></span>Laagste van die week</span>
+        <span>⚡ Seizoensrecord hoog</span>
+        <span>📋 Seizoensrecord laag</span>
+        <span>⭐ Superweekend</span>
+        <span><span class="dot g"></span>Telt niet mee (✕)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HALL OF FAME ============ -->
+  <section class="paneel" id="p-hof">
+    <div class="card">
+      <h2>🏛️ Hall of Fame</h2>
+      <p class="uitleg">De erelijst van de ETH Scorito BBQ: alle bekerwinnaars en BBQ-organisatoren van de afgelopen seizoenen.</p>
+      <div id="hofLijst"></div>
+    </div>
+    <div class="card" id="hofAdminCard" style="display:none">
+      <h2>Seizoen toevoegen of bewerken</h2>
+      <div class="rondekop">
+        <div style="min-width:160px">
+          <label for="hofSeizoen">Seizoen</label><br>
+          <input type="text" id="hofSeizoen" placeholder="bijv. 2025/26" style="width:140px">
+        </div>
+      </div>
+      <div class="duo">
+        <div>
+          <h3>🏆 Winnaar (beker)</h3>
+          <input type="text" id="hofWinNaam" placeholder="Naam winnaar">
+          <div class="knoppenrij">
+            <button class="actie stil mini" id="btnHofWinFoto">📷 Avatar kiezen</button>
+            <img id="hofWinPreview" class="hof-avatar" alt="" style="display:none">
+          </div>
+          <input type="file" id="hofWinFile" accept="image/png,image/jpeg,image/webp" style="display:none">
+        </div>
+        <div>
+          <h3>🍖 Verliezer (BBQ)</h3>
+          <input type="text" id="hofVerlNaam" placeholder="Naam verliezer">
+          <div class="knoppenrij">
+            <button class="actie stil mini" id="btnHofVerlFoto">📷 Avatar kiezen</button>
+            <img id="hofVerlPreview" class="hof-avatar" alt="" style="display:none">
+          </div>
+          <input type="file" id="hofVerlFile" accept="image/png,image/jpeg,image/webp" style="display:none">
+        </div>
+      </div>
+      <div class="knoppenrij">
+        <button class="actie" id="btnHofOpslaan">Seizoen opslaan</button>
+        <button class="actie stil" id="btnHofLeeg">Formulier leegmaken</button>
+      </div>
+      <div class="status" id="hofStatus"></div>
+    </div>
+  </section>
+
+  <!-- ============ RONDE TOEVOEGEN (admin) ============ -->
+  <section class="paneel" id="p-upload">
+    <div class="card">
+      <h2>1 · Weekstand uploaden</h2>
+      <p class="uitleg">Maak in Scorito printscreens van de <strong>weekstand</strong>. Bij veel deelnemers (linker- én rechterrijtje): upload het eerste screenshot, lees het uit, en upload daarna het tweede — de deelnemers worden automatisch samengevoegd in één controlelijst.</p>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Screenshot weekstand uploaden">
+        <div class="groot">📸 Sleep je weekstand-screenshot hierheen</div>
+        <div class="klein">of klik om een bestand te kiezen, of plak met Ctrl+V (PNG / JPG)</div>
+        <img class="preview" id="preview" alt="" style="display:none">
+      </div>
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" style="display:none">
+      <div class="knoppenrij">
+        <button class="actie" id="btnLees" disabled>Scores uitlezen</button>
+        <button class="actie stil" id="btnHandmatig">Handmatig invoeren</button>
+      </div>
+      <div class="status" id="uploadStatus"></div>
+    </div>
+
+    <div class="card" id="reviewCard" style="display:none">
+      <h2 id="reviewTitel">Controleer de scores</h2>
+      <p class="uitleg" id="reviewHint" style="display:none">Tweede screenshot (het andere rijtje)? Upload hem hierboven en klik opnieuw op <strong>Scores uitlezen</strong> — de deelnemers worden aan deze lijst toegevoegd.</p>
+      <div class="rondekop">
+        <div>
+          <label for="rondeNr">Speelronde</label><br>
+          <input type="number" id="rondeNr" min="1" max="34" value="1">
+        </div>
+        <label class="telt-toggle" for="teltMee">
+          <input type="checkbox" id="teltMee" checked>
+          <span>Deze ronde <strong>telt mee</strong> voor de prijzen</span>
+        </label>
+        <label class="telt-toggle" for="superWeekend">
+          <input type="checkbox" id="superWeekend">
+          <span>⭐ <strong>Superweekend</strong> (aanvoerder telt 3× i.p.v. 2×)</span>
+        </label>
+      </div>
+      <table class="editor"><tbody id="editorRijen"></tbody></table>
+      <div class="knoppenrij">
+        <button class="actie stil mini" id="btnRijErbij">+ Deelnemer toevoegen</button>
+      </div>
+      <div class="knoppenrij">
+        <button class="actie" id="btnOpslaan">Ronde opslaan</button>
+        <button class="actie stil" id="btnAnnuleer">Annuleren</button>
+        <button class="actie gevaar" id="btnVerwijder" style="display:none">Ronde verwijderen</button>
+      </div>
+      <div class="status" id="saveStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>2 · Spelerspunten van deze ronde</h2>
+      <p class="uitleg">Voor de <strong>mail-tips</strong> heeft de app per speelronde de punten nodig van alle eredivisie-spelers die in íemands selectie zitten (één gedeelde lijst — geen screenshots per deelnemer). Vul de lijst handmatig in, of upload screenshots van de Scorito-spelerstatistieken om hem automatisch te vullen. Je kunt meerdere screenshots na elkaar uitlezen; de resultaten worden samengevoegd.</p>
+      <div class="rondekop">
+        <div>
+          <label for="spRonde">Speelronde</label><br>
+          <input type="number" id="spRonde" min="1" max="34" value="1">
+        </div>
+        <div style="align-self:flex-end">
+          <button class="actie stil mini" id="btnSpLijst">Laad spelerslijst</button>
+        </div>
+      </div>
+      <div class="dropzone" id="spDropzone" tabindex="0" role="button" aria-label="Screenshot spelerspunten uploaden">
+        <div class="groot">📸 Screenshot met spelerspunten (optioneel)</div>
+        <div class="klein">bijv. de Scorito-statistiekenpagina van die ronde</div>
+        <img class="preview" id="spPreview" alt="" style="display:none">
+      </div>
+      <input type="file" id="spFileInput" accept="image/png,image/jpeg,image/webp" style="display:none">
+      <div class="knoppenrij">
+        <button class="actie" id="btnSpLees" disabled>Spelerspunten uitlezen</button>
+      </div>
+      <div class="status" id="spUploadStatus"></div>
+      <div id="spEditorBlok" style="display:none;margin-top:16px">
+        <table class="editor">
+          <tr><th>Speler</th><th style="width:150px">Positie</th><th style="width:110px">Punten</th><th></th></tr>
+          <tbody id="spEditorRijen"></tbody>
+        </table>
+        <div class="knoppenrij">
+          <button class="actie stil mini" id="btnSpRijErbij">+ Speler toevoegen</button>
+        </div>
+        <div class="knoppenrij">
+          <button class="actie" id="btnSpOpslaan">Spelerspunten opslaan</button>
+        </div>
+        <div class="status" id="spSaveStatus"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SELECTIES (admin) ============ -->
+  <section class="paneel" id="p-teams">
+    <div class="card">
+      <h2>Selecties per deelnemer</h2>
+      <p class="uitleg">Leg aan het begin van het seizoen per deelnemer het e-mailadres en de gekozen selectie vast (speler + positie). Bij de <strong>winterstop</strong> pas je de selecties hier gewoon aan. Let op: wijzigingen gelden voor alle berekeningen vanaf dat moment — de mail-tips van al gemailde rondes hoef je immers niet opnieuw te maken.</p>
+      <div class="rondekop">
+        <div style="min-width:200px">
+          <label for="teamDeelnemer">Deelnemer</label><br>
+          <select id="teamDeelnemer"></select>
+        </div>
+        <div style="min-width:240px;flex:1">
+          <label for="teamEmail">E-mailadres</label><br>
+          <input type="email" id="teamEmail" placeholder="naam@voorbeeld.nl">
+        </div>
+      </div>
+      <h3>Selectie</h3>
+      <table class="editor">
+        <tr><th>Speler</th><th style="width:170px">Positie</th><th></th></tr>
+        <tbody id="squadRijen"></tbody>
+      </table>
+      <div class="knoppenrij">
+        <button class="actie stil mini" id="btnSquadRij">+ Speler toevoegen</button>
+      </div>
+      <div class="knoppenrij">
+        <button class="actie" id="btnTeamOpslaan">Selectie opslaan</button>
+      </div>
+      <div class="status" id="teamStatus"></div>
+    </div>
+  </section>
+
+  <!-- ============ MAIL-TIPS (admin) ============ -->
+  <section class="paneel" id="p-tips">
+    <div class="card">
+      <h2>📬 Mail-tips per ronde</h2>
+      <p class="uitleg">Per deelnemer de ideale opstelling van die week uit hún selectie (binnen de toegestane Scorito-formaties), inclusief de beste <strong>aanvoerder</strong> (punten tellen dubbel). De delta is het verschil tussen het ideale puntentotaal en hun werkelijke weekscore — de gekozen opstelling zelf hoeft de app dus niet te kennen.</p>
+      <div class="rondekop">
+        <div>
+          <label for="tipRonde">Speelronde</label><br>
+          <select id="tipRonde"></select>
+        </div>
+      </div>
+      <div id="tipsHouder"></div>
+    </div>
+  </section>
+
+  <!-- ============ INSTELLINGEN (admin) ============ -->
+  <section class="paneel" id="p-instellingen">
+    <div class="card">
+      <h2>Instellingen</h2>
+      <p class="uitleg">Het admin-wachtwoord wordt <strong>serverside</strong> gecontroleerd en staat als environment variable <strong>ADMIN_WACHTWOORD</strong> in Netlify (Site configuration → Environment variables). Wijzig je het daar, doe dan daarna Deploys → Trigger deploy — er staat dus nooit een wachtwoord in de code of in de browser.</p>
+      <div class="knoppenrij">
+        <button class="actie stil" id="btnUitloggen">Uitloggen</button>
+      </div>
+      <div class="status" id="pinStatus"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============ LOGIN MODAL ============ -->
+<div class="overlay" id="loginOverlay">
+  <div class="modal">
+    <h2>🔒 Admin-login</h2>
+    <p>Voer het wachtwoord in om rondes toe te voegen of te bewerken.</p>
+    <input type="password" id="pinInvoer" placeholder="Wachtwoord" autocomplete="current-password">
+    <div class="knoppenrij">
+      <button class="actie" id="btnLogin">Inloggen</button>
+      <button class="actie stil" id="btnLoginSluit">Sluiten</button>
+    </div>
+    <div class="status" id="loginStatus"></div>
+  </div>
+</div>
+
+<script>
+/* =============== state & opslag =============== */
+/* Gedeelde opslag via de eigen Netlify-backend (Netlify Blobs).
+   Iedereen die de site opent ziet dezelfde standen; schrijven kan alleen
+   met het admin-wachtwoord, dat sérverside wordt gecontroleerd. */
+const API_DATA = '/.netlify/functions/data';
+const API_EXTRACT = '/.netlify/functions/extract';
+const POSITIES = { K:'Keeper', V:'Verdediger', M:'Middenvelder', A:'Aanvaller' };
+const FORMATIES = [[3,4,3],[3,5,2],[4,3,3],[4,4,2],[4,5,1],[5,3,2],[5,4,1]];
+
+let data = { rounds: {}, teams: {}, spelerpunten: {} };
+/* rounds:      { "3": { scores:{deelnemer:punten}, telt:true } }
+   teams:       { deelnemer: { email:'', squad:[{naam,positie}] } }
+   spelerpunten:{ "3": { spelernaam: punten } }  — één gedeelde lijst per ronde */
+let isAdmin = false;
+let adminWachtwoord = null;
+let bewerkRonde = null;
+let uploadBase64 = null, uploadMime = null;
+let spBase64 = null, spMime = null;
+
+function migreer(d){
+  if(!d.rounds) d.rounds = {};
+  if(!d.teams) d.teams = {};
+  if(!d.spelerpunten) d.spelerpunten = {};
+  if(!d.halloffame) d.halloffame = [];
+  Object.keys(d.rounds).forEach(nr=>{
+    const r = d.rounds[nr];
+    if(r && r.scores === undefined) d.rounds[nr] = { scores: r };
+    if(d.rounds[nr].telt === undefined) d.rounds[nr].telt = true;
+    if(d.rounds[nr].superweekend === undefined) d.rounds[nr].superweekend = false;
+    if(d.rounds[nr].scores === undefined) d.rounds[nr].scores = {};
+    // oude per-deelnemer spelerspunten omzetten naar de gedeelde lijst
+    if(d.rounds[nr].spelerspunten){
+      if(!d.spelerpunten[nr]) d.spelerpunten[nr] = {};
+      Object.values(d.rounds[nr].spelerspunten).forEach(arr=>{
+        (arr||[]).forEach(s=>{
+          if(s && s.naam && d.spelerpunten[nr][s.naam]===undefined && Number.isFinite(s.punten))
+            d.spelerpunten[nr][s.naam] = s.punten;
+        });
+      });
+      delete d.rounds[nr].spelerspunten;
+    }
+  });
+  return d;
+}
+async function laadData(){
+  try{
+    const resp = await fetch(API_DATA, { cache:'no-store' });
+    if(resp.ok){
+      const json = await resp.json();
+      if(json && json.data) data = migreer(json.data);
+    }
+  }catch(e){ /* nog geen data of server niet bereikbaar — prima */ }
+  data = migreer(data);
+}
+async function bewaarData(statusId){
+  try{
+    const resp = await fetch(API_DATA, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord || '' },
+      body: JSON.stringify({ data })
+    });
+    if(!resp.ok) throw new Error('status '+resp.status);
+  }
+  catch(e){ if(statusId) toonStatus(statusId,'fout','Opslaan mislukt — probeer het opnieuw.'); throw e; }
+}
+
+/* =============== helpers =============== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function toonStatus(id, soort, html){
+  const el = $(id);
+  el.className = 'status zichtbaar ' + soort;
+  el.innerHTML = html;
+}
+function verbergStatus(id){ $(id).className = 'status'; }
+function scoreDeelnemers(){
+  const s = new Set();
+  Object.values(data.rounds).forEach(r => Object.keys(r.scores).forEach(n => s.add(n)));
+  return [...s].sort((a,b)=>a.localeCompare(b,'nl'));
+}
+function alleDeelnemers(){
+  const s = new Set(scoreDeelnemers());
+  Object.keys(data.teams).forEach(n => s.add(n));
+  return [...s].sort((a,b)=>a.localeCompare(b,'nl'));
+}
+function rondeNummers(){ return Object.keys(data.rounds).map(Number).sort((a,b)=>a-b); }
+function unieqeSquadSpelers(){
+  // unie van alle selecties: [{naam, positie}], eerste positie-vermelding wint
+  const kaart = new Map();
+  Object.values(data.teams).forEach(t=>{
+    (t.squad||[]).forEach(s=>{
+      const sleutel = s.naam.toLowerCase();
+      if(!kaart.has(sleutel)) kaart.set(sleutel, {naam:s.naam, positie:s.positie});
+    });
+  });
+  return [...kaart.values()].sort((a,b)=>a.naam.localeCompare(b.naam,'nl'));
+}
+function positieVoorSpeler(naam){
+  const sleutel = naam.toLowerCase();
+  for(const t of Object.values(data.teams)){
+    const m = (t.squad||[]).find(s=>s.naam.toLowerCase()===sleutel);
+    if(m) return m.positie;
+  }
+  return null;
+}
+function puntenVoorSpeler(nr, naam){
+  const lijst = data.spelerpunten[nr];
+  if(!lijst) return undefined;
+  if(lijst[naam]!==undefined) return lijst[naam];
+  const sleutel = naam.toLowerCase();
+  const gevonden = Object.keys(lijst).find(k=>k.toLowerCase()===sleutel);
+  return gevonden!==undefined ? lijst[gevonden] : undefined;
+}
+function extremen(scores){
+  const vals = Object.values(scores);
+  if(!vals.length) return {winnaars:[],verliezers:[]};
+  const max = Math.max(...vals), min = Math.min(...vals);
+  return {
+    winnaars: Object.keys(scores).filter(n=>scores[n]===max),
+    verliezers: Object.keys(scores).filter(n=>scores[n]===min)
+  };
+}
+function tellingen(){
+  const totaal = {}, gespeeld = {};
+  rondeNummers().forEach(nr=>{
+    const r = data.rounds[nr];
+    if(!r.telt) return;
+    Object.entries(r.scores).forEach(([n,p])=>{ totaal[n]=(totaal[n]||0)+p; gespeeld[n]=(gespeeld[n]||0)+1; });
+  });
+  return {totaal, gespeeld};
+}
+function records(){
+  const prestaties = [];
+  rondeNummers().forEach(nr=>{
+    const r = data.rounds[nr];
+    if(!r.telt) return;
+    Object.entries(r.scores).forEach(([n,p])=>prestaties.push({naam:n, punten:p, ronde:nr}));
+  });
+  if(!prestaties.length) return null;
+  const maxP = Math.max(...prestaties.map(p=>p.punten));
+  const minP = Math.min(...prestaties.map(p=>p.punten));
+  const verloopHoog = [], verloopLaag = [];
+  let besteH = -Infinity, besteL = Infinity;
+  prestaties.forEach(p=>{
+    if(p.punten > besteH){ besteH = p.punten; verloopHoog.push(p); }
+    if(p.punten < besteL){ besteL = p.punten; verloopLaag.push(p); }
+  });
+  return {
+    prestaties,
+    hoog: prestaties.filter(p=>p.punten===maxP),
+    laag: prestaties.filter(p=>p.punten===minP),
+    verloopHoog, verloopLaag
+  };
+}
+
+/* =============== ideale opstelling + aanvoerder + bank =============== */
+function optimaleOpstelling(spelers, superweekend){
+  // spelers: [{naam, positie(K/V/M/A), punten}]
+  // aanvoerder: punten tellen 2× (superweekend: 3×) → extra = punten × factor
+  // bank: de 4 beste overgebleven spelers tellen voor 50% mee
+  const factor = superweekend ? 2 : 1;
+  const groepen = {K:[],V:[],M:[],A:[]};
+  spelers.forEach(s=>{ if(groepen[s.positie]) groepen[s.positie].push(s); });
+  Object.values(groepen).forEach(g=>g.sort((a,b)=>b.punten-a.punten));
+  let best = null;
+  FORMATIES.forEach(([v,m,a])=>{
+    if(groepen.K.length<1 || groepen.V.length<v || groepen.M.length<m || groepen.A.length<a) return;
+    const elf = {K:[groepen.K[0]], V:groepen.V.slice(0,v), M:groepen.M.slice(0,m), A:groepen.A.slice(0,a)};
+    const alle = [].concat(elf.K,elf.V,elf.M,elf.A);
+    const basis = alle.reduce((s,x)=>s+x.punten,0);
+    const aanvoerder = alle.reduce((b,x)=> x.punten>b.punten ? x : b, alle[0]);
+    const extraAanvoerder = aanvoerder.punten * factor;
+    const inElf = new Set(alle.map(x=>x.naam.toLowerCase()));
+    const bank = spelers.filter(s=>!inElf.has(s.naam.toLowerCase()))
+      .sort((a,b)=>b.punten-a.punten).slice(0,4);
+    const bankPunten = bank.reduce((s,x)=>s+Math.round(x.punten/2),0);
+    const tot = basis + extraAanvoerder + bankPunten;
+    if(!best || tot>best.tot) best = {formatie:`1-${v}-${m}-${a}`, elf, basis, aanvoerder, extraAanvoerder, bank, bankPunten, tot, factor};
+  });
+  return best;
+}
+
+/* =============== renderen =============== */
+function renderAlles(){
+  renderPrijzenkast(); renderStanden(); renderChart(); renderMatrix();
+  renderTeamsUI(); renderTips(); renderHof(); renderAdminUI();
+}
+
+/* ---------- prijzenkast ---------- */
+function renderPrijzenkast(){
+  const meetellend = rondeNummers().filter(nr=>data.rounds[nr].telt && Object.keys(data.rounds[nr].scores).length);
+  const {totaal} = tellingen();
+  const rec = records();
+  const namen = scoreDeelnemers();
+  const kaart = (klasse, icoon, label, houder, sub) => `
+    <div class="prijs ${klasse}">
+      <span class="icoon">${icoon}</span>
+      <div class="label">${label}</div>
+      <div class="houder">${houder}</div>
+      <div class="sub">${sub}</div>
+    </div>`;
+  if(!meetellend.length || !rec){
+    $('prijzenkast').innerHTML =
+      kaart('goud','🏆','De Beker','Nog open','Nog geen meetellende ronde')
+      + kaart('','⚡','Weekprijs','—','Hoogste weekscore van het seizoen')
+      + kaart('','📋','Opdracht','—','Laagste weekscore van het seizoen')
+      + kaart('rood','🍖','De BBQ','Nog open','Iemand gaat grillen…');
+    return;
+  }
+  const gesorteerd = [...namen].sort((a,b)=>(totaal[b]||0)-(totaal[a]||0));
+  const top = gesorteerd[0], laag = gesorteerd[gesorteerd.length-1];
+  const recTekst = arr => [...new Set(arr.map(p=>p.naam))].join(' & ');
+  const recSub = arr => arr[0].punten + ' punten' + (arr.length===1 ? ' in R'+arr[0].ronde : '');
+  $('prijzenkast').innerHTML =
+    kaart('goud','🏆','De Beker · koploper', esc(top), (totaal[top]||0)+' punten totaal')
+    + kaart('','⚡','Weekprijs · record', esc(recTekst(rec.hoog)), recSub(rec.hoog))
+    + kaart('','📋','Opdracht · record', esc(recTekst(rec.laag)), recSub(rec.laag))
+    + kaart('rood','🍖','De BBQ · hekkensluiter', esc(laag), (totaal[laag]||0)+' punten totaal');
+}
+
+/* ---------- record- en standtabellen ---------- */
+function standTabel(arr, eenheid, extra=null){
+  const namen = scoreDeelnemers();
+  if(!namen.length) return '<div class="leeg">Nog geen deelnemers — voeg eerst een speelronde toe.</div>';
+  const rijen = namen.map(n=>({n, v:arr[n]||0, e: extra?extra[n]||0:null}))
+    .sort((a,b)=> b.v-a.v || a.n.localeCompare(b.n,'nl'));
+  return `<table class="stand">
+    <tr><th></th><th>Deelnemer</th>${extra?'<th style="text-align:right">Rondes</th>':''}<th style="text-align:right">${eenheid}</th></tr>
+    ${rijen.map((r,i)=>`<tr class="${i===0&&r.v>0?'p1':''}">
+      <td class="pos">${i+1}</td><td>${esc(r.n)}</td>
+      ${extra?`<td style="text-align:right;color:var(--chalk-dim)">${r.e}</td>`:''}
+      <td class="num">${r.v}</td></tr>`).join('')}
+  </table>`;
+}
+function recordBlok(rec, richting){
+  const huidige = richting==='hoog' ? rec.hoog : rec.laag;
+  const verloop = richting==='hoog' ? rec.verloopHoog : rec.verloopLaag;
+  const kleurVar = richting==='hoog' ? 'var(--amber)' : 'var(--red)';
+  const top5 = [...rec.prestaties]
+    .sort((a,b)=> richting==='hoog' ? b.punten-a.punten || a.ronde-b.ronde : a.punten-b.punten || a.ronde-b.ronde)
+    .slice(0,5);
+  const houderTekst = [...new Set(huidige.map(p=>p.naam))].join(' & ');
+  const rondeTekst = huidige.length===1 ? ' · ronde '+huidige[0].ronde : '';
+  let html = `<div style="margin-bottom:16px">
+    <div style="font-family:'Barlow Condensed';font-weight:800;font-size:34px;line-height:1;color:${kleurVar}">${huidige[0].punten} <span style="font-size:18px;font-weight:700">punten</span></div>
+    <div style="font-family:'Barlow Condensed';font-weight:700;font-size:20px;text-transform:uppercase;margin-top:4px">${esc(houderTekst)}<span style="color:var(--chalk-dim);font-size:15px;text-transform:none;font-weight:600">${rondeTekst}</span></div>
+  </div>`;
+  if(verloop.length > 1){
+    html += `<h3>Recordverloop</h3><div style="font-size:14px;color:var(--chalk-dim);line-height:1.9;margin-bottom:14px">`
+      + verloop.map((p,i)=>{
+          const laatste = i===verloop.length-1;
+          return `<span style="${laatste?'color:'+kleurVar+';font-weight:700':''}">R${p.ronde} ${esc(p.naam)} ${p.punten}</span>`;
+        }).join(' <span style="opacity:.5">→</span> ')
+      + `</div>`;
+  }
+  html += `<h3>Top 5 van het seizoen</h3><table class="stand">
+    <tr><th></th><th>Deelnemer</th><th>Ronde</th><th style="text-align:right">Punten</th></tr>
+    ${top5.map((p,i)=>`<tr class="${i===0?'p1':''}">
+      <td class="pos">${i+1}</td><td>${esc(p.naam)}</td>
+      <td style="color:var(--chalk-dim)">R${p.ronde}</td>
+      <td class="num">${p.punten}</td></tr>`).join('')}
+  </table>`;
+  return html;
+}
+function renderStanden(){
+  const {totaal, gespeeld} = tellingen();
+  const rec = records();
+  const leegMelding = '<div class="leeg">Nog geen meetellende rondes ingevoerd.</div>';
+  $('standHoog').innerHTML = rec ? recordBlok(rec,'hoog') : leegMelding;
+  $('standLaag').innerHTML = rec ? recordBlok(rec,'laag') : leegMelding;
+  $('standTotaal').innerHTML = standTabel(totaal,'Punten',gespeeld);
+}
+
+/* ---------- positieverloop-dashboard ---------- */
+const KLEUREN = ['#FFB300','#4FC3F7','#F06292','#AED581','#B39DDB','#FF8A65','#4DB6AC','#F2EFE6','#E05548','#7986CB','#FFD54F','#81D4FA','#A5D6A7','#CE93D8','#FFCC80'];
+function kleurVoor(naam){
+  const namen = scoreDeelnemers();
+  return KLEUREN[namen.indexOf(naam) % KLEUREN.length];
+}
+function initialen(naam){
+  const delen = naam.trim().split(/\s+/);
+  return (delen.length>1 ? delen[0][0]+delen[delen.length-1][0] : naam.slice(0,2)).toUpperCase();
+}
+function renderChart(){
+  const nrs = rondeNummers().filter(nr=>Object.keys(data.rounds[nr].scores).length);
+  const namen = scoreDeelnemers();
+  const houder = $('chartHouder');
+  if(!nrs.length || namen.length < 2){
+    houder.innerHTML = '<div class="leeg">Zodra er rondes zijn ingevoerd verschijnt hier het positieverloop.</div>';
+    return;
+  }
+  const cum = {}; namen.forEach(n=>cum[n]=0);
+  const standen = [];
+  nrs.forEach(nr=>{
+    const r = data.rounds[nr];
+    if(r.telt) Object.entries(r.scores).forEach(([n,p])=>{ cum[n]=(cum[n]||0)+p; });
+    const volgorde = [...namen].sort((a,b)=>(cum[b]||0)-(cum[a]||0) || a.localeCompare(b,'nl'));
+    const pos = {}; let vorigePt = null, vorigePos = 0;
+    volgorde.forEach((n,i)=>{
+      const pt = cum[n]||0;
+      if(pt === vorigePt){ pos[n] = vorigePos; }
+      else { pos[n] = i+1; vorigePos = i+1; vorigePt = pt; }
+    });
+    standen.push({nr, telt:r.telt, pos, tot:{...cum}});
+  });
+
+  const stap = 62, padL = 46, padT = 24, padB = 46, rijH = Math.max(34, Math.min(46, 520/namen.length)), labelW = 168;
+  const x = i => padL + i*stap;
+  const y = p => padT + (p-1)*rijH;
+  const H = padT + (namen.length-1)*rijH + padB;
+  const W = padL + (nrs.length-1)*stap + labelW;
+
+  let svg = `<svg width="${Math.max(W,560)}" height="${H}" viewBox="0 0 ${Math.max(W,560)} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Positieverloop per speelronde" style="font-family:'Barlow',sans-serif">`;
+  for(let p=1; p<=namen.length; p++){
+    svg += `<line x1="${padL-8}" y1="${y(p)}" x2="${x(nrs.length-1)+16}" y2="${y(p)}" stroke="rgba(242,239,230,.10)" stroke-width="1"/>`;
+    svg += `<text x="${padL-14}" y="${y(p)+4}" text-anchor="end" font-size="12" fill="rgba(242,239,230,.5)" font-weight="600">${p}e</text>`;
+  }
+  standen.forEach((s,i)=>{
+    svg += `<text x="${x(i)}" y="${H-14}" text-anchor="middle" font-size="12" fill="rgba(242,239,230,${s.telt?'.6':'.35'})" font-weight="700" ${s.telt?'':'font-style="italic"'}>R${s.nr}${s.telt?'':'✕'}</text>`;
+  });
+  namen.forEach(n=>{
+    const kleur = kleurVoor(n);
+    const punten = standen.map((s,i)=>`${x(i)},${y(s.pos[n])}`).join(' ');
+    svg += `<polyline points="${punten}" fill="none" stroke="${kleur}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>`;
+  });
+  namen.forEach(n=>{
+    const kleur = kleurVoor(n);
+    standen.forEach((s,i)=>{
+      const vulling = s.telt ? kleur : 'var(--pitch-card)';
+      svg += `<circle cx="${x(i)}" cy="${y(s.pos[n])}" r="4.5" fill="${vulling}" stroke="${kleur}" stroke-width="2">`
+           + `<title>${esc(n)} — na ronde ${s.nr}: ${s.pos[n]}e (${s.tot[n]||0} punten)${s.telt?'':' · ronde telt niet mee'}</title></circle>`;
+    });
+  });
+  const laatste = standen[standen.length-1];
+  const eind = namen.map(n=>({n, py: y(laatste.pos[n])}))
+    .sort((a,b)=>a.py-b.py || a.n.localeCompare(b.n,'nl'));
+  let vorigeY = -Infinity;
+  eind.forEach(e=>{ e.ly = Math.max(e.py, vorigeY + 28); vorigeY = e.ly; });
+  eind.forEach(e=>{
+    const kleur = kleurVoor(e.n);
+    const ax = x(nrs.length-1) + 34;
+    if(Math.abs(e.ly - e.py) > 2){
+      svg += `<line x1="${x(nrs.length-1)+7}" y1="${e.py}" x2="${ax-14}" y2="${e.ly}" stroke="${kleur}" stroke-width="1.5" opacity=".5" stroke-dasharray="3 3"/>`;
+    }
+    svg += `<circle cx="${ax}" cy="${e.ly}" r="13" fill="${kleur}"/>`
+         + `<text x="${ax}" y="${e.ly+4}" text-anchor="middle" font-size="11" font-weight="800" fill="#14251C" style="font-family:'Barlow Condensed',sans-serif">${initialen(e.n)}</text>`
+         + `<text x="${ax+20}" y="${e.ly+4}" font-size="13.5" font-weight="600" fill="${kleur}">${esc(e.n)}</text>`;
+  });
+  svg += '</svg>';
+  houder.innerHTML = svg;
+  houder.scrollLeft = houder.scrollWidth;
+}
+
+/* ---------- weekmatrix ---------- */
+function renderMatrix(){
+  const nrs = rondeNummers().filter(nr=>Object.keys(data.rounds[nr].scores).length);
+  const namen = scoreDeelnemers();
+  if(!nrs.length){ $('matrixHouder').innerHTML = '<div class="leeg">Nog geen rondes ingevoerd.</div>'; return; }
+  const ext = {}; nrs.forEach(nr => ext[nr] = extremen(data.rounds[nr].scores));
+  const rec = records();
+  const recHoog = new Set(rec ? rec.hoog.map(p=>p.ronde+'|'+p.naam) : []);
+  const recLaag = new Set(rec ? rec.laag.map(p=>p.ronde+'|'+p.naam) : []);
+  const klik = isAdmin ? 'klikbaar' : '';
+  let html = '<table class="matrix"><tr><th>Deelnemer</th>' +
+    nrs.map(nr=>{
+      const telt = data.rounds[nr].telt;
+      const ster = data.rounds[nr].superweekend ? ' ⭐' : '';
+      return `<th class="rnd ${klik} ${telt?'':'telt-niet'}" data-ronde="${nr}" title="${isAdmin?'Klik om ronde '+nr+' te bewerken':''}">R${nr}${ster}${telt?'':' ✕'}</th>`;
+    }).join('') + '</tr>';
+  namen.forEach(n=>{
+    html += `<tr><td>${esc(n)}</td>` + nrs.map(nr=>{
+      const r = data.rounds[nr];
+      const p = r.scores[n];
+      if(p===undefined) return `<td class="${r.telt?'':'telt-niet'}" style="color:var(--chalk-dim)">–</td>`;
+      if(!r.telt) return `<td class="telt-niet">${p}</td>`;
+      const k = ext[nr].winnaars.includes(n) ? 'hoog' : ext[nr].verliezers.includes(n) ? 'laag' : '';
+      const record = recHoog.has(nr+'|'+n) ? ' ⚡' : recLaag.has(nr+'|'+n) ? ' 📋' : '';
+      return `<td class="${k}">${p}${record}</td>`;
+    }).join('') + '</tr>';
+  });
+  $('matrixHouder').innerHTML = html + '</table>';
+  if(isAdmin){
+    document.querySelectorAll('th.rnd').forEach(th=>{
+      th.addEventListener('click', ()=> openEditor(Number(th.dataset.ronde)));
+    });
+  }
+  $('matrixUitleg').textContent = isAdmin
+    ? 'Alle scores per speelronde. Klik op een rondenummer om die ronde te bewerken.'
+    : 'Alle scores per speelronde. Rondes met een ✕ tellen niet mee voor de prijzen.';
+}
+
+/* =============== admin: login & UI =============== */
+function renderAdminUI(){
+  document.querySelectorAll('.tab.adm').forEach(t=>t.classList.toggle('verborgen', !isAdmin));
+  $('hofAdminCard').style.display = isAdmin ? 'block' : 'none';
+  const b = $('btnAdmin');
+  b.textContent = isAdmin ? '🔓 Admin actief' : '🔒 Admin';
+  b.classList.toggle('ingelogd', isAdmin);
+  if(!isAdmin){
+    const open = document.querySelector('section.paneel.actief');
+    if(open && ['p-upload','p-teams','p-tips','p-instellingen'].includes(open.id)) gaNaarTab('p-standen');
+  }
+}
+$('btnAdmin').addEventListener('click', ()=>{
+  if(isAdmin){ gaNaarTab('p-instellingen'); return; }
+  verbergStatus('loginStatus');
+  $('pinInvoer').value = '';
+  $('loginOverlay').classList.add('open');
+  setTimeout(()=>$('pinInvoer').focus(), 50);
+});
+$('btnLoginSluit').addEventListener('click', ()=>$('loginOverlay').classList.remove('open'));
+async function probeerLogin(){
+  const pin = $('pinInvoer').value.trim();
+  if(!pin){ toonStatus('loginStatus','fout','Vul het wachtwoord in.'); return; }
+  try{
+    const resp = await fetch('/.netlify/functions/verify', {
+      method:'POST',
+      headers:{ 'x-wachtwoord': pin }
+    });
+    if(resp.ok){
+      adminWachtwoord = pin;
+      isAdmin = true;
+      $('loginOverlay').classList.remove('open');
+      renderAlles();
+      gaNaarTab('p-upload');
+    } else if(resp.status === 401){
+      toonStatus('loginStatus','fout','Onjuist wachtwoord.');
+    } else {
+      toonStatus('loginStatus','fout','Server gaf een fout ('+resp.status+') — is ADMIN_WACHTWOORD ingesteld?');
+    }
+  }catch(e){
+    toonStatus('loginStatus','fout','Kan de server niet bereiken — draait de app wel?');
+  }
+}
+$('btnLogin').addEventListener('click', probeerLogin);
+$('pinInvoer').addEventListener('keydown', e=>{ if(e.key==='Enter') probeerLogin(); });
+
+$('btnUitloggen').addEventListener('click', ()=>{ isAdmin=false; adminWachtwoord=null; renderAlles(); });
+
+/* =============== tabs =============== */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('actief'));
+    document.querySelectorAll('.paneel').forEach(x=>x.classList.remove('actief'));
+    t.classList.add('actief');
+    $(t.dataset.doel).classList.add('actief');
+  });
+});
+function gaNaarTab(id){ document.querySelector(`.tab[data-doel="${id}"]`).click(); }
+
+/* =============== AI-hulp (via de eigen serverproxy) =============== */
+async function vraagClaude(base64, mime, prompt){
+  const resp = await fetch(API_EXTRACT, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord || '' },
+    body: JSON.stringify({ image: base64, mime, prompt })
+  });
+  if(!resp.ok) throw new Error('extract mislukt ('+resp.status+')');
+  const json = await resp.json();
+  return JSON.parse(String(json.tekst||'').replace(/```json|```/g,'').trim());
+}
+function dropzoneKoppel(zoneId, inputId, previewId, statusId, knopId, cb){
+  const dz = $(zoneId), fi = $(inputId);
+  const verwerk = file=>{
+    if(!/^image\/(png|jpeg|webp)$/.test(file.type)){
+      toonStatus(statusId,'fout','Alleen PNG-, JPG- of WEBP-afbeeldingen worden ondersteund.'); return;
+    }
+    const r = new FileReader();
+    r.onload = ()=>{
+      cb(r.result.split(',')[1], file.type);
+      $(previewId).src = r.result;
+      $(previewId).style.display = 'block';
+      $(knopId).disabled = false;
+      verbergStatus(statusId);
+    };
+    r.onerror = ()=>toonStatus(statusId,'fout','Bestand lezen mislukt — probeer opnieuw.');
+    r.readAsDataURL(file);
+  };
+  dz.addEventListener('click', ()=>fi.click());
+  dz.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') fi.click(); });
+  dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('over');});
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('over');
+    if(e.dataTransfer.files.length) verwerk(e.dataTransfer.files[0]);
+  });
+  fi.addEventListener('change', ()=>{ if(fi.files.length) verwerk(fi.files[0]); });
+  return verwerk;
+}
+
+/* =============== weekstand: upload & editor (met samenvoegen) =============== */
+const verwerkWeekstand = dropzoneKoppel('dropzone','fileInput','preview','uploadStatus','btnLees',(b64,mime)=>{ uploadBase64=b64; uploadMime=mime; });
+
+/* Ctrl+V: geplakte screenshots (bijv. via Win+Shift+S) landen in de juiste dropzone */
+let laatstePlakDoel = 'week';
+['click','dragover'].forEach(ev=>{
+  $('dropzone').addEventListener(ev, ()=>laatstePlakDoel='week');
+  $('spDropzone').addEventListener(ev, ()=>laatstePlakDoel='sp');
+});
+document.addEventListener('paste', e=>{
+  if(!isAdmin) return;
+  const uploadTabOpen = $('p-upload').classList.contains('actief');
+  if(!uploadTabOpen) return;
+  const item = [...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
+  if(!item) return;
+  e.preventDefault();
+  const file = item.getAsFile();
+  if(!file) return;
+  if(laatstePlakDoel==='sp') verwerkSpelerspunten(file);
+  else verwerkWeekstand(file);
+});
+
+$('btnLees').addEventListener('click', async ()=>{
+  if(!uploadBase64) return;
+  $('btnLees').disabled = true;
+  toonStatus('uploadStatus','info','<span class="laden"></span>Scores worden uitgelezen uit je screenshot…');
+  try{
+    const bestaande = scoreDeelnemers();
+    const prompt = `Dit is een screenshot van een Scorito eredivisie-poule met de WEEKSTAND van één speelronde (mogelijk één van twee kolommen bij veel deelnemers).
+Lees per deelnemer de naam en het aantal punten van deze week uit.
+${bestaande.length ? 'Bekende deelnemers in deze poule (gebruik exact deze spelling als een naam overeenkomt): ' + bestaande.join(', ') + '.' : ''}
+Als het rondenummer / speelronde zichtbaar is, geef dat ook terug.
+Antwoord UITSLUITEND met geldige JSON, zonder toelichting of markdown:
+{"ronde": <nummer of null>, "scores": [{"naam": "...", "punten": <geheel getal>}]}`;
+    const parsed = await vraagClaude(uploadBase64, uploadMime, prompt);
+    if(!parsed.scores || !parsed.scores.length) throw new Error('geen scores');
+    verbergStatus('uploadStatus');
+    const reviewOpen = $('reviewCard').style.display !== 'none' && bewerkRonde === null;
+    if(reviewOpen){
+      voegScoresSamen(parsed.scores);
+      toonStatus('uploadStatus','info','Screenshot toegevoegd ✓ — de lijst hieronder is samengevoegd.');
+    } else {
+      openEditor(null, parsed);
+    }
+    // klaar voor een eventueel volgend screenshot
+    uploadBase64=null; $('preview').style.display='none'; $('btnLees').disabled=true; $('fileInput').value='';
+  }catch(e){
+    toonStatus('uploadStatus','fout','Uitlezen is niet gelukt. Probeer een scherpere screenshot, of kies <strong>Handmatig invoeren</strong>.');
+    $('btnLees').disabled = false;
+  }
+});
+$('btnHandmatig').addEventListener('click', ()=> openEditor(null, null));
+
+function editorNamen(){
+  return [...$('editorRijen').querySelectorAll('tr')]
+    .map(tr=>tr.querySelector('input[type=text]').value.trim().toLowerCase())
+    .filter(Boolean);
+}
+function voegScoresSamen(scores){
+  const aanwezig = new Set(editorNamen());
+  scores.forEach(s=>{
+    const naam = String(s.naam||'').trim();
+    if(!naam || aanwezig.has(naam.toLowerCase())) return;
+    $('editorRijen').appendChild(editorRij(naam, Number.isFinite(s.punten)?s.punten:''));
+    aanwezig.add(naam.toLowerCase());
+  });
+}
+function editorRij(naam='', punten=''){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><input type="text" placeholder="Naam" value="${esc(naam)}"></td>
+    <td style="width:110px"><input type="number" placeholder="0" value="${punten}"></td>
+    <td class="smal"><button class="rij-x" title="Rij verwijderen" aria-label="Rij verwijderen">✕</button></td>`;
+  tr.querySelector('.rij-x').addEventListener('click', ()=>tr.remove());
+  return tr;
+}
+function openEditor(ronde, extract){
+  if(!isAdmin) return;
+  bewerkRonde = ronde;
+  const tb = $('editorRijen'); tb.innerHTML = '';
+  verbergStatus('saveStatus');
+  $('reviewHint').style.display = 'none';
+  if(ronde !== null){
+    $('reviewTitel').textContent = 'Ronde ' + ronde + ' bewerken';
+    $('rondeNr').value = ronde;
+    $('teltMee').checked = data.rounds[ronde].telt;
+    $('superWeekend').checked = !!data.rounds[ronde].superweekend;
+    Object.entries(data.rounds[ronde].scores).forEach(([n,p])=>tb.appendChild(editorRij(n,p)));
+    $('btnVerwijder').style.display = 'inline-block';
+    gaNaarTab('p-upload');
+  } else {
+    $('reviewTitel').textContent = extract ? 'Controleer de scores' : 'Handmatige invoer';
+    $('reviewHint').style.display = extract ? 'block' : 'none';
+    const volgende = rondeNummers().length ? Math.max(...rondeNummers())+1 : 1;
+    $('rondeNr').value = (extract && extract.ronde) ? extract.ronde : volgende;
+    $('teltMee').checked = true;
+    $('superWeekend').checked = false;
+    if(extract){
+      extract.scores.forEach(s=>tb.appendChild(editorRij(String(s.naam||''), Number.isFinite(s.punten)?s.punten:'')));
+    } else {
+      const namen = scoreDeelnemers();
+      if(namen.length) namen.forEach(n=>tb.appendChild(editorRij(n,'')));
+      else for(let i=0;i<4;i++) tb.appendChild(editorRij());
+    }
+    $('btnVerwijder').style.display = 'none';
+  }
+  $('reviewCard').style.display = 'block';
+  $('reviewCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+$('btnRijErbij').addEventListener('click', ()=>$('editorRijen').appendChild(editorRij()));
+$('btnAnnuleer').addEventListener('click', ()=>{ $('reviewCard').style.display='none'; bewerkRonde=null; });
+
+$('btnOpslaan').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  const nr = parseInt($('rondeNr').value, 10);
+  if(!nr || nr<1 || nr>34){ toonStatus('saveStatus','fout','Vul een geldig rondenummer in (1–34).'); return; }
+  const scores = {};
+  let fout = null;
+  const bestaande = alleDeelnemers();
+  $('editorRijen').querySelectorAll('tr').forEach(tr=>{
+    const [ni, pi] = tr.querySelectorAll('input');
+    let naam = ni.value.trim();
+    if(!naam) return;
+    const match = bestaande.find(b=>b.toLowerCase()===naam.toLowerCase());
+    if(match) naam = match;
+    const p = parseInt(pi.value, 10);
+    if(!Number.isFinite(p)){ fout = 'Vul voor elke deelnemer een puntenaantal in.'; return; }
+    if(scores[naam]!==undefined){ fout = 'Deelnemer "'+naam+'" staat er dubbel in.'; return; }
+    scores[naam] = p;
+  });
+  if(fout){ toonStatus('saveStatus','fout',fout); return; }
+  if(Object.keys(scores).length < 2){ toonStatus('saveStatus','fout','Voer minimaal twee deelnemers in.'); return; }
+  if(bewerkRonde===null && data.rounds[nr] && Object.keys(data.rounds[nr].scores).length){
+    toonStatus('saveStatus','fout','Ronde '+nr+' bestaat al. Kies een ander nummer, of klik in het weekoverzicht op R'+nr+' om die te bewerken.');
+    return;
+  }
+  if(bewerkRonde!==null && bewerkRonde!==nr){
+    data.rounds[nr] = data.rounds[bewerkRonde];
+    delete data.rounds[bewerkRonde];
+    if(data.spelerpunten[bewerkRonde]){
+      data.spelerpunten[nr] = data.spelerpunten[bewerkRonde];
+      delete data.spelerpunten[bewerkRonde];
+    }
+  }
+  if(!data.rounds[nr]) data.rounds[nr] = { scores:{}, telt:true, superweekend:false };
+  data.rounds[nr].scores = scores;
+  data.rounds[nr].telt = $('teltMee').checked;
+  data.rounds[nr].superweekend = $('superWeekend').checked;
+  await bewaarData('saveStatus');
+  const aantalSuper = rondeNummers().filter(x=>data.rounds[x].superweekend).length;
+  uploadBase64=null; $('preview').style.display='none'; $('btnLees').disabled=true; $('fileInput').value='';
+  $('reviewCard').style.display='none'; bewerkRonde=null;
+  renderAlles();
+  gaNaarTab('p-standen');
+  if(aantalSuper > 4){
+    toonStatus('uploadStatus','info','⚠ Let op: er zijn nu '+aantalSuper+' superweekenden gemarkeerd — Scorito kent er maar 4 per seizoen.');
+  }
+});
+
+$('btnVerwijder').addEventListener('click', async ()=>{
+  if(!isAdmin || bewerkRonde===null) return;
+  if(!confirm('Ronde '+bewerkRonde+' definitief verwijderen (inclusief spelerspunten)?')) return;
+  delete data.rounds[bewerkRonde];
+  delete data.spelerpunten[bewerkRonde];
+  await bewaarData('saveStatus');
+  $('reviewCard').style.display='none'; bewerkRonde=null;
+  renderAlles();
+});
+
+/* =============== spelerspunten (gedeelde lijst per ronde) =============== */
+const verwerkSpelerspunten = dropzoneKoppel('spDropzone','spFileInput','spPreview','spUploadStatus','btnSpLees',(b64,mime)=>{ spBase64=b64; spMime=mime; });
+
+function spelerPuntenRij(naam='', punten=''){
+  const tr = document.createElement('tr');
+  const pos = naam ? positieVoorSpeler(naam) : null;
+  tr.innerHTML = `<td><input type="text" placeholder="Spelernaam" value="${esc(naam)}"></td>
+    <td><span class="positie-label ${pos?'':'onbekend'}">${pos ? POSITIES[pos] : 'niet in een selectie'}</span></td>
+    <td><input type="number" placeholder="—" value="${punten}"></td>
+    <td class="smal"><button class="rij-x" title="Rij verwijderen" aria-label="Rij verwijderen">✕</button></td>`;
+  tr.querySelector('.rij-x').addEventListener('click', ()=>tr.remove());
+  tr.querySelector('input[type=text]').addEventListener('change', e=>{
+    const p = positieVoorSpeler(e.target.value.trim());
+    const lbl = tr.querySelector('.positie-label');
+    lbl.textContent = p ? POSITIES[p] : 'niet in een selectie';
+    lbl.classList.toggle('onbekend', !p);
+  });
+  return tr;
+}
+function laadSpelersLijst(){
+  const nr = parseInt($('spRonde').value, 10);
+  const tb = $('spEditorRijen'); tb.innerHTML = '';
+  verbergStatus('spSaveStatus');
+  const spelers = unieqeSquadSpelers();
+  if(!spelers.length){
+    toonStatus('spUploadStatus','fout','Nog geen selecties ingevoerd — vul die eerst in onder <strong>Selecties</strong>.');
+    return;
+  }
+  const bestaand = data.spelerpunten[nr] || {};
+  spelers.forEach(s=>{
+    const p = puntenVoorSpeler(nr, s.naam);
+    tb.appendChild(spelerPuntenRij(s.naam, p!==undefined ? p : ''));
+  });
+  // eventueel opgeslagen punten van spelers die niet (meer) in een selectie zitten ook tonen
+  Object.keys(bestaand).forEach(naam=>{
+    if(!spelers.some(s=>s.naam.toLowerCase()===naam.toLowerCase()))
+      tb.appendChild(spelerPuntenRij(naam, bestaand[naam]));
+  });
+  $('spEditorBlok').style.display = 'block';
+}
+$('btnSpLijst').addEventListener('click', laadSpelersLijst);
+
+$('btnSpLees').addEventListener('click', async ()=>{
+  if(!spBase64) return;
+  $('btnSpLees').disabled = true;
+  toonStatus('spUploadStatus','info','<span class="laden"></span>Spelerspunten worden uitgelezen…');
+  try{
+    const bekend = unieqeSquadSpelers().map(s=>s.naam);
+    const prompt = `Dit is een screenshot met eredivisie-spelers en hun Scorito-punten van één speelronde.
+Lees per speler de naam en het puntenaantal van die ronde uit (kan negatief zijn).
+${bekend.length ? 'Relevante spelers (gebruik exact deze spelling als een naam overeenkomt): ' + bekend.join(', ') + '.' : ''}
+Antwoord UITSLUITEND met geldige JSON, zonder toelichting of markdown:
+{"spelers": [{"naam":"...","punten":<geheel getal>}]}`;
+    const parsed = await vraagClaude(spBase64, spMime, prompt);
+    if(!parsed.spelers || !parsed.spelers.length) throw new Error('geen spelers');
+    if($('spEditorBlok').style.display === 'none') laadSpelersLijst();
+    // samenvoegen in de tabel
+    const rijen = [...$('spEditorRijen').querySelectorAll('tr')];
+    let bijgewerkt = 0, nieuw = 0;
+    parsed.spelers.forEach(s=>{
+      const naam = String(s.naam||'').trim();
+      if(!naam || !Number.isFinite(s.punten)) return;
+      const rij = rijen.find(tr=>tr.querySelector('input[type=text]').value.trim().toLowerCase()===naam.toLowerCase());
+      if(rij){ rij.querySelector('input[type=number]').value = s.punten; bijgewerkt++; }
+      else { $('spEditorRijen').appendChild(spelerPuntenRij(naam, s.punten)); nieuw++; }
+    });
+    toonStatus('spUploadStatus','info',`Screenshot verwerkt ✓ — ${bijgewerkt} spelers bijgewerkt${nieuw?', '+nieuw+' toegevoegd':''}. Upload gerust nog een screenshot, of sla de lijst op.`);
+    spBase64=null; $('spPreview').style.display='none'; $('spFileInput').value='';
+  }catch(e){
+    toonStatus('spUploadStatus','fout','Uitlezen is niet gelukt. Probeer een scherpere screenshot, of vul de lijst handmatig in.');
+  }finally{
+    $('btnSpLees').disabled = true;
+  }
+});
+
+$('btnSpRijErbij').addEventListener('click', ()=>$('spEditorRijen').appendChild(spelerPuntenRij()));
+$('btnSpOpslaan').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  const nr = parseInt($('spRonde').value, 10);
+  if(!nr || nr<1 || nr>34){ toonStatus('spSaveStatus','fout','Vul een geldig rondenummer in (1–34).'); return; }
+  const lijst = {};
+  $('spEditorRijen').querySelectorAll('tr').forEach(tr=>{
+    const naam = tr.querySelector('input[type=text]').value.trim();
+    const p = parseInt(tr.querySelector('input[type=number]').value, 10);
+    if(naam && Number.isFinite(p)) lijst[naam] = p;
+  });
+  if(!Object.keys(lijst).length){ toonStatus('spSaveStatus','fout','Vul minimaal één speler met punten in. Lege punten worden overgeslagen.'); return; }
+  data.spelerpunten[nr] = lijst;
+  await bewaarData('spSaveStatus');
+  toonStatus('spSaveStatus','info','Spelerspunten van ronde '+nr+' opgeslagen ✓ ('+Object.keys(lijst).length+' spelers) — bekijk het resultaat onder Mail-tips.');
+  renderTips();
+});
+
+/* =============== selecties-beheer =============== */
+function renderTeamsUI(){
+  const namen = alleDeelnemers();
+  const sel = $('teamDeelnemer');
+  const huidig = sel.value;
+  sel.innerHTML = namen.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
+    + '<option value="__nieuw__">+ Nieuwe deelnemer…</option>';
+  if(huidig && [...sel.options].some(o=>o.value===huidig)) sel.value = huidig;
+  laadTeamInEditor();
+}
+function laadTeamInEditor(vanuitGebruiker){
+  const sel = $('teamDeelnemer');
+  let naam = sel.value;
+  if(naam === '__nieuw__'){
+    if(!vanuitGebruiker){
+      // bij het laden van de app niets vragen — editor gewoon leeg laten
+      $('teamEmail').value=''; $('squadRijen').innerHTML='';
+      return;
+    }
+    naam = prompt('Naam van de nieuwe deelnemer:');
+    if(!naam || !naam.trim()){ sel.selectedIndex = 0; naam = sel.value; }
+    else {
+      naam = naam.trim();
+      if(!data.teams[naam]) data.teams[naam] = { email:'', squad:[] };
+      renderTeamsUI();
+      sel.value = naam;
+    }
+  }
+  if(!naam || naam==='__nieuw__'){ $('teamEmail').value=''; $('squadRijen').innerHTML=''; return; }
+  const team = data.teams[naam] || { email:'', squad:[] };
+  $('teamEmail').value = team.email || '';
+  const tb = $('squadRijen'); tb.innerHTML = '';
+  (team.squad||[]).forEach(s=>tb.appendChild(squadRij(s.naam, s.positie)));
+  if(!(team.squad||[]).length) for(let i=0;i<5;i++) tb.appendChild(squadRij());
+}
+function squadRij(naam='', positie='M'){
+  const tr = document.createElement('tr');
+  const opties = Object.entries(POSITIES).map(([k,v])=>`<option value="${k}" ${k===positie?'selected':''}>${v}</option>`).join('');
+  tr.innerHTML = `<td><input type="text" placeholder="Spelernaam" value="${esc(naam)}"></td>
+    <td><select>${opties}</select></td>
+    <td class="smal"><button class="rij-x" title="Rij verwijderen" aria-label="Rij verwijderen">✕</button></td>`;
+  tr.querySelector('.rij-x').addEventListener('click', ()=>tr.remove());
+  return tr;
+}
+$('teamDeelnemer').addEventListener('change', ()=>laadTeamInEditor(true));
+$('btnSquadRij').addEventListener('click', ()=>$('squadRijen').appendChild(squadRij()));
+$('btnTeamOpslaan').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  const naam = $('teamDeelnemer').value;
+  if(!naam || naam==='__nieuw__'){ toonStatus('teamStatus','fout','Kies eerst een deelnemer.'); return; }
+  const squad = [];
+  $('squadRijen').querySelectorAll('tr').forEach(tr=>{
+    const sp = tr.querySelector('input[type=text]').value.trim();
+    if(!sp) return;
+    squad.push({naam:sp, positie:tr.querySelector('select').value});
+  });
+  data.teams[naam] = { email: $('teamEmail').value.trim(), squad };
+  await bewaarData('teamStatus');
+  toonStatus('teamStatus','info','Selectie van '+esc(naam)+' opgeslagen ✓ ('+squad.length+' spelers)');
+  renderTips();
+});
+
+/* =============== hall of fame =============== */
+let hofWinAvatar = null, hofVerlAvatar = null, hofBewerkIndex = null;
+function verkleinAvatar(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const c = document.createElement('canvas');
+        const maat = 128;
+        c.width = maat; c.height = maat;
+        const zijde = Math.min(img.width, img.height);
+        const sx = (img.width - zijde)/2, sy = (img.height - zijde)/2;
+        c.getContext('2d').drawImage(img, sx, sy, zijde, zijde, 0, 0, maat, maat);
+        res(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = rej;
+      img.src = r.result;
+    };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+function hofFotoKoppel(knopId, fileId, previewId, zet){
+  $(knopId).addEventListener('click', ()=>$(fileId).click());
+  $(fileId).addEventListener('change', async ()=>{
+    const f = $(fileId).files[0];
+    if(!f) return;
+    if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ toonStatus('hofStatus','fout','Alleen PNG-, JPG- of WEBP-afbeeldingen.'); return; }
+    try{
+      const dataUrl = await verkleinAvatar(f);
+      zet(dataUrl);
+      $(previewId).src = dataUrl;
+      $(previewId).style.display = 'inline-block';
+      verbergStatus('hofStatus');
+    }catch(e){ toonStatus('hofStatus','fout','Foto verwerken mislukt — probeer een andere afbeelding.'); }
+  });
+}
+hofFotoKoppel('btnHofWinFoto','hofWinFile','hofWinPreview', v=>hofWinAvatar=v);
+hofFotoKoppel('btnHofVerlFoto','hofVerlFile','hofVerlPreview', v=>hofVerlAvatar=v);
+
+function hofFormulierLeeg(){
+  hofWinAvatar = null; hofVerlAvatar = null; hofBewerkIndex = null;
+  $('hofSeizoen').value = ''; $('hofWinNaam').value = ''; $('hofVerlNaam').value = '';
+  $('hofWinPreview').style.display = 'none'; $('hofVerlPreview').style.display = 'none';
+  $('hofWinFile').value = ''; $('hofVerlFile').value = '';
+  $('btnHofOpslaan').textContent = 'Seizoen opslaan';
+  verbergStatus('hofStatus');
+}
+$('btnHofLeeg').addEventListener('click', hofFormulierLeeg);
+
+function hofAvatarHtml(persoon, klasse){
+  if(persoon.avatar) return `<img class="hof-avatar ${klasse}" src="${persoon.avatar}" alt="">`;
+  const kleur = klasse==='goud' ? 'var(--amber)' : 'var(--red)';
+  return `<div class="hof-initialen" style="background:${kleur}">${esc(initialen(persoon.naam||'?'))}</div>`;
+}
+function renderHof(){
+  const lijst = [...(data.halloffame||[])].sort((a,b)=>String(b.seizoen).localeCompare(String(a.seizoen),'nl'));
+  if(!lijst.length){
+    $('hofLijst').innerHTML = '<div class="leeg">Nog geen seizoenen in de erelijst'+(isAdmin?' — voeg hieronder het eerste seizoen toe.':'.')+'</div>';
+    return;
+  }
+  $('hofLijst').innerHTML = lijst.map(e=>{
+    const idx = data.halloffame.indexOf(e);
+    return `<div class="hof-rij">
+      <div class="hof-seizoen">${esc(e.seizoen)}</div>
+      <div class="hof-persoon">
+        ${hofAvatarHtml(e.winnaar,'goud')}
+        <div><div class="hof-naam" style="color:var(--amber)">${esc(e.winnaar.naam)}</div><div class="hof-rol">🏆 Bekerwinnaar</div></div>
+      </div>
+      <div class="hof-persoon">
+        ${hofAvatarHtml(e.verliezer,'rood')}
+        <div><div class="hof-naam" style="color:var(--red)">${esc(e.verliezer.naam)}</div><div class="hof-rol">🍖 BBQ-organisator</div></div>
+      </div>
+      ${isAdmin ? `<div class="hof-acties">
+        <button class="actie stil mini hof-bewerk" data-idx="${idx}">Bewerken</button>
+        <button class="actie gevaar mini hof-weg" data-idx="${idx}">Verwijderen</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  if(isAdmin){
+    $('hofLijst').querySelectorAll('.hof-bewerk').forEach(b=>b.addEventListener('click', ()=>{
+      const e = data.halloffame[Number(b.dataset.idx)];
+      if(!e) return;
+      hofBewerkIndex = Number(b.dataset.idx);
+      $('hofSeizoen').value = e.seizoen;
+      $('hofWinNaam').value = e.winnaar.naam;
+      $('hofVerlNaam').value = e.verliezer.naam;
+      hofWinAvatar = e.winnaar.avatar || null;
+      hofVerlAvatar = e.verliezer.avatar || null;
+      $('hofWinPreview').src = hofWinAvatar || ''; $('hofWinPreview').style.display = hofWinAvatar ? 'inline-block':'none';
+      $('hofVerlPreview').src = hofVerlAvatar || ''; $('hofVerlPreview').style.display = hofVerlAvatar ? 'inline-block':'none';
+      $('btnHofOpslaan').textContent = 'Wijzigingen opslaan';
+      $('hofAdminCard').scrollIntoView({behavior:'smooth', block:'start'});
+    }));
+    $('hofLijst').querySelectorAll('.hof-weg').forEach(b=>b.addEventListener('click', async ()=>{
+      const e = data.halloffame[Number(b.dataset.idx)];
+      if(!e || !confirm('Seizoen '+e.seizoen+' uit de Hall of Fame verwijderen?')) return;
+      data.halloffame.splice(Number(b.dataset.idx), 1);
+      await bewaarData('hofStatus');
+      hofFormulierLeeg();
+      renderHof();
+    }));
+  }
+}
+$('btnHofOpslaan').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  const seizoen = $('hofSeizoen').value.trim();
+  const winNaam = $('hofWinNaam').value.trim();
+  const verlNaam = $('hofVerlNaam').value.trim();
+  if(!seizoen || !winNaam || !verlNaam){
+    toonStatus('hofStatus','fout','Vul seizoen, winnaar en verliezer in (avatars zijn optioneel).');
+    return;
+  }
+  const entry = { seizoen, winnaar:{naam:winNaam, avatar:hofWinAvatar}, verliezer:{naam:verlNaam, avatar:hofVerlAvatar} };
+  if(hofBewerkIndex !== null && data.halloffame[hofBewerkIndex]){
+    data.halloffame[hofBewerkIndex] = entry;
+  } else {
+    if(data.halloffame.some(e=>e.seizoen===seizoen)){
+      toonStatus('hofStatus','fout','Seizoen '+esc(seizoen)+' staat al in de lijst — gebruik Bewerken om het aan te passen.');
+      return;
+    }
+    data.halloffame.push(entry);
+  }
+  await bewaarData('hofStatus');
+  hofFormulierLeeg();
+  renderHof();
+  toonStatus('hofStatus','info','Opgeslagen ✓');
+});
+
+/* =============== mail-tips =============== */
+function tipData(nr, deelnemer){
+  const team = data.teams[deelnemer];
+  if(!team || !(team.squad||[]).length) return { fout:'Geen selectie bekend — vul die in onder Selecties.' };
+  const bekend = [], ontbrekend = [];
+  team.squad.forEach(s=>{
+    const p = puntenVoorSpeler(nr, s.naam);
+    if(p !== undefined) bekend.push({naam:s.naam, positie:s.positie, punten:p});
+    else ontbrekend.push(s.naam);
+  });
+  if(bekend.length < 11) return { fout:'Te weinig spelerspunten bekend voor deze ronde ('+bekend.length+' van '+team.squad.length+'). Vul de spelerspuntenlijst aan.', ontbrekend };
+  const r = data.rounds[nr];
+  const superweekend = !!(r && r.superweekend);
+  const best = optimaleOpstelling(bekend, superweekend);
+  if(!best) return { fout:'Geen geldige formatie mogelijk met de bekende spelers — controleer de posities in de selectie.', ontbrekend };
+  const werkelijk = r && r.scores[deelnemer] !== undefined ? r.scores[deelnemer] : null;
+  return {
+    best, ontbrekend, superweekend,
+    werkelijk,
+    verschil: werkelijk !== null ? best.tot - werkelijk : null
+  };
+}
+function tipMailTekst(nr, deelnemer, t){
+  const linie = (label, arr)=> label+': '+arr.map(s=>`${s.naam} (${s.punten})`).join(', ');
+  const maal = t.superweekend ? '3×' : '2×';
+  let tekst = `Hoi ${deelnemer},\n\n`;
+  if(t.superweekend) tekst += `⭐ Speelronde ${nr} was een SUPERWEEKEND: de aanvoerder telde 3× in plaats van 2×!\n\n`;
+  if(t.werkelijk !== null) tekst += `Jouw weekscore in speelronde ${nr}: ${t.werkelijk} punten.\n`;
+  tekst += `De ideale opstelling uit jouw selectie (${t.best.formatie}, met ${t.best.aanvoerder.naam} als aanvoerder) was ${t.best.tot} punten waard`;
+  if(t.verschil !== null){
+    tekst += t.verschil > 0
+      ? ` — je liet dus ${t.verschil} punten liggen!\n\n`
+      : ` — je zat er dus maximaal in. Chapeau!\n\n`;
+  } else {
+    tekst += `.\n\n`;
+  }
+  tekst += `Ideale opstelling van deze week:\n`;
+  tekst += linie('Keeper', t.best.elf.K)+'\n';
+  tekst += linie('Verdediging', t.best.elf.V)+'\n';
+  tekst += linie('Middenveld', t.best.elf.M)+'\n';
+  tekst += linie('Aanval', t.best.elf.A)+'\n';
+  tekst += `Aanvoerder: ${t.best.aanvoerder.naam} (${t.best.aanvoerder.punten} punten, telt ${maal})\n`;
+  if(t.best.bank.length){
+    tekst += `Bank (telt 50%): ${t.best.bank.map(s=>`${s.naam} (${s.punten})`).join(', ')}\n`;
+  }
+  tekst += `Totaal: ${t.best.basis} basis + ${t.best.extraAanvoerder} aanvoerder-bonus + ${t.best.bankPunten} bank = ${t.best.tot} punten\n`;
+  if(t.ontbrekend.length){
+    tekst += `\nP.S. Van deze spelers uit je selectie waren de punten (nog) niet bekend: ${t.ontbrekend.join(', ')}.\n`;
+  }
+  tekst += `\nGroeten,\nDe poulebaas`;
+  return tekst;
+}
+function renderTips(){
+  const sel = $('tipRonde');
+  const nrs = rondeNummers().filter(nr=>Object.keys(data.spelerpunten[nr]||{}).length);
+  const huidig = sel.value;
+  sel.innerHTML = nrs.map(nr=>`<option value="${nr}">Ronde ${nr}${data.rounds[nr]&&data.rounds[nr].superweekend?' ⭐':''}</option>`).join('');
+  if(huidig && nrs.includes(Number(huidig))) sel.value = huidig;
+  else if(nrs.length) sel.value = nrs[nrs.length-1];
+  renderTipKaarten();
+}
+function renderTipKaarten(){
+  const houder = $('tipsHouder');
+  const nr = parseInt($('tipRonde').value, 10);
+  if(!nr){ houder.innerHTML = '<div class="leeg">Nog geen spelerspunten ingevoerd. Doe dat eerst via "Ronde toevoegen" → stap 2.</div>'; return; }
+  const deelnemers = Object.keys(data.teams).filter(d=>(data.teams[d].squad||[]).length).sort((a,b)=>a.localeCompare(b,'nl'));
+  if(!deelnemers.length){ houder.innerHTML = '<div class="leeg">Nog geen selecties ingevoerd — doe dat eerst onder Selecties.</div>'; return; }
+  let html = '';
+  deelnemers.forEach(d=>{
+    const t = tipData(nr, d);
+    if(t.fout){
+      html += `<div class="tipkaart"><div class="tipnaam">${esc(d)}</div><div class="leeg">${t.fout}</div></div>`;
+      return;
+    }
+    const linieHtml = (label, arr)=>`<div class="linie"><b>${label}</b>${arr.map(s=>{
+      const ster = s.naam===t.best.aanvoerder.naam ? ' ⭐' : '';
+      return `${esc(s.naam)}${ster} <span style="color:var(--chalk-dim)">(${s.punten})</span>`;
+    }).join(' · ')}</div>`;
+    const email = (data.teams[d]||{}).email || '';
+    const mailTekst = tipMailTekst(nr, d, t);
+    const onderwerp = t.verschil !== null && t.verschil > 0
+      ? `Scorito-tip ronde ${nr}: je liet ${t.verschil} punten liggen`
+      : `Scorito-tip ronde ${nr}: jouw ideale opstelling`;
+    const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(mailTekst)}`;
+    let deltaHtml;
+    if(t.verschil === null) deltaHtml = '<span class="gemist nul">weekscore onbekend</span>';
+    else if(t.verschil > 0) deltaHtml = `<span class="gemist">−${t.verschil} punten gemist</span>`;
+    else deltaHtml = '<span class="gemist nul">✓ Maximale score</span>';
+    html += `<div class="tipkaart">
+      <div class="tipkop">
+        <span class="tipnaam">${esc(d)}${t.superweekend?' <span style="color:var(--amber);font-size:15px">⭐ Superweekend</span>':''}</span>
+        ${deltaHtml}
+      </div>
+      <div style="font-size:14px;color:var(--chalk-dim);margin-bottom:10px">
+        ${t.werkelijk!==null ? 'Werkelijk: <strong style="color:var(--chalk)">'+t.werkelijk+'</strong> · ' : ''}
+        Ideaal (${t.best.formatie}): <strong style="color:var(--amber)">${t.best.tot}</strong>
+        <span style="opacity:.7">(${t.best.basis} basis + ${t.best.extraAanvoerder} aanvoerder + ${t.best.bankPunten} bank)</span>
+      </div>
+      ${linieHtml('K', t.best.elf.K)}
+      ${linieHtml('V', t.best.elf.V)}
+      ${linieHtml('M', t.best.elf.M)}
+      ${linieHtml('A', t.best.elf.A)}
+      <div class="aanvoerder">⭐ Beste aanvoerder: ${esc(t.best.aanvoerder.naam)} (${t.best.aanvoerder.punten} punten × ${t.superweekend?'3':'2'})</div>
+      ${t.best.bank.length ? `<div class="linie"><b>Bank</b>${t.best.bank.map(s=>`${esc(s.naam)} <span style="color:var(--chalk-dim)">(${s.punten} → ${Math.round(s.punten/2)})</span>`).join(' · ')}</div>` : ''}
+      ${t.ontbrekend.length ? `<div class="waarschuwing">⚠ Punten onbekend voor: ${t.ontbrekend.map(esc).join(', ')}</div>` : ''}
+      <div class="knoppenrij">
+        <a href="${mailto}"><button class="actie mini" ${email?'':'title="Geen e-mailadres bekend — vul dat in onder Selecties"'}>📧 Open in mail${email?'':' (geen adres)'}</button></a>
+        <button class="actie stil mini kopieer" data-tekst="${esc(mailTekst)}">Kopieer tekst</button>
+      </div>
+    </div>`;
+  });
+  houder.innerHTML = html || '<div class="leeg">Geen gegevens voor deze ronde.</div>';
+  houder.querySelectorAll('.kopieer').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      try{
+        await navigator.clipboard.writeText(b.dataset.tekst);
+        b.textContent = 'Gekopieerd ✓';
+        setTimeout(()=>b.textContent='Kopieer tekst', 1800);
+      }catch(e){ b.textContent = 'Kopiëren mislukt'; }
+    });
+  });
+}
+$('tipRonde').addEventListener('change', renderTipKaarten);
+
+/* =============== start =============== */
+(async ()=>{ await laadData(); renderAlles(); })();
+</script>
+</body>
+</html>
