@@ -1632,7 +1632,75 @@ $('btnHofOpslaan').addEventListener('click', async ()=>{
 
 /* =============== reglement =============== */
 const REGLEMENT_API = '/.netlify/functions/reglement';
-let reglementTekst = '';
+const DEFAULT_REGLEMENT = `**ETH SCORITO BBQ REGLEMENT**
+
+Officiële statuten en reglementen
+Vastgesteld door en bindend voor alle deelnemers
+Editie 2026
+
+---
+
+**ARTIKEL 1 — DEELNEMERS**
+
+1.1 Deelname aan ETH Scorito BBQ staat open voor de personen die zich bij aanvang hebben aangesloten.
+1.2 Elke deelnemer verklaart zich bij toetreding akkoord met dit reglement.
+1.3 Deelnemers verbinden zich tot sportief en respectvol gedrag.
+
+---
+
+**ARTIKEL 2 — VERLIEZER EN DE BBQ**
+
+2.1 De deelnemer die als laatste eindigt in de competitie, hierna te noemen 'de Verliezer', is verplicht een BBQ te organiseren.
+2.2 Deze BBQ dient in beginsel plaats te vinden bij de woning van de Verliezer.
+2.3 Indien dit niet mogelijk is, dient de Verliezer een alternatieve locatie te verzorgen die voldoet aan de volgende voorwaarden:
+a) De locatie is overdekt;
+b) Er zijn toiletvoorzieningen aanwezig;
+c) De locatie kan muziek en elektronica huisvesten;
+d) Er kan gekoeld drinken worden verzorgd;
+e) Overige benodigdheden dienen door de deelnemers zelf te worden meegenomen;
+f) Enkel en alleen het eten dient door de Verliezer te worden verzorgd.
+2.4 Het Bestuur is niet, en vooral voelt zich niet verantwoordelijk voor eventuele ruzies en/of echtscheidingen als gevolg van het verplicht organiseren van een BBQ aan de overige leden.
+2.5 Bij niet-naleving van de verplichtingen zoals bedoeld in dit artikel, zal de groep protesteren in de voortuin van de Verliezer, waarbij het Bestuur een BBQ organiseert op een door het Bestuur gekozen tijdstip.
+
+---
+
+**ARTIKEL 3 — EXTRA PRIJZEN EN VERLIEZERS**
+
+3.1 **Het Eredivisie Orakel.** Voorafgaand aan de start van de Eredivisie-competitie voorspelt iedere deelnemer de volledige eindstand van alle Eredivisie-teams, alsmede de drie spelers die dat seizoen de meeste doelpunten zullen scoren ('de Topscorerslijst'). De puntentelling is als volgt:
+a) 3 punten per team dat op de juiste positie in de eindstand is voorspeld;
+b) 5 bonuspunten indien de juiste kampioen is voorspeld;
+c) 5 punten per juist voorspelde topscorer binnen de Topscorerslijst;
+d) 5 bonuspunten indien de nummer 1 topscorer correct is voorspeld;
+e) De deelnemer met de hoogste eindscore wint het Eredivisie Orakel en ontvangt hiervoor aan het einde van het seizoen een mooie prijs.
+
+3.2 **Hoogste weekscore (BrianBrobbeyBeast Bokaal – BBBB).** De deelnemer die gedurende het gehele seizoen de hoogste score in een enkele speelweek behaalt, wordt aan het einde van het seizoen bekroond met de BrianBrobbeyBeast Bokaal (BBBB), als eerbetoon aan deze uitzonderlijke prestatie.
+
+3.3 **Laagste weekscore (RonaldKoemanLaffePisblek Bokaal – RFLPB).** De deelnemer die gedurende het gehele seizoen de laagste score in een enkele speelweek behaalt, ontvangt de RonaldKoemanLaffePisblek Bokaal (RFLPB) als aanmoedigingsprijs.
+
+---
+
+**ARTIKEL 4 — WINNAAR EN DE WISSELTROFEE**
+
+4.1 De deelnemer die de competitie wint, hierna te noemen 'de Winnaar', is verplicht de officiële wisseltrofee een volledig jaar in huis te nemen.
+4.2 De Winnaar dient de wisseltrofee gedurende deze periode te verzorgen, schoon te houden en te onderhouden.
+4.3 De Winnaar is verplicht de wisseltrofee, gepoetst en in goede staat, mee te nemen naar de eerstvolgende BBQ voor overdracht aan de nieuwe Winnaar.
+
+---
+
+**ARTIKEL 5 — CHAMPAGNE ADDENDUM (BOY VAN DE WIJVERT-REGEL)**
+
+5.1 Indien een deelnemer zich na vaststelling van de datum van de BBQ afmeldt, geldt dit als een 'laffe afmelding'.
+5.2 Sanctie op een laffe afmelding is dat er een BBQ zal worden georganiseerd bij de desbetreffende deelnemer, op een datum naar keuze van het Bestuur.
+5.3 Deze sanctie wordt uitgevoerd ongeacht de aanwezigheid van de betrokken deelnemer.
+
+---
+
+**ARTIKEL 6 — SLOTBEPALING**
+
+6.1 In alle gevallen waarin dit reglement niet voorziet, beslist het Bestuur van ETH Scorito BBQ.
+6.2 Dit reglement treedt in werking op de dag van vaststelling door de deelnemers.`;
+
+let reglementTekst = DEFAULT_REGLEMENT;
 
 async function laadReglement(){
   try{
