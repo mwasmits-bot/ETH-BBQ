@@ -311,16 +311,15 @@
   <section class="paneel" id="p-reglement">
     <div class="card">
       <h2>📋 ETH Scorito BBQ Reglement</h2>
-      <div id="reglementViewer" style="min-height:600px;background:var(--pitch-deep);border-radius:10px;overflow:hidden"></div>
+      <div id="reglementViewer" style="line-height:1.8;color:var(--chalk);font-size:15px;white-space:pre-wrap;word-wrap:break-word;padding:20px;background:var(--pitch-deep);border-radius:10px;min-height:400px;max-height:800px;overflow-y:auto"></div>
     </div>
     <div class="card" id="reglementAdminCard" style="display:none">
       <h2>Reglement beheren</h2>
-      <p class="uitleg">Upload het officiële PDF-reglement — dat zie je en je vrienden hierboven.</p>
-      <div style="border:2px dashed var(--line);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--pitch-deep)" id="reglementDropzone">
-        <div class="groot">📄 Sleep je PDF hierheen</div>
-        <div class="klein">of klik om een bestand te kiezen</div>
+      <p class="uitleg">Plak het reglement-tekst hieronder. Je kunt opmaak (vetgedrukt, lijnen) gebruiken door ** voor vet ** te schrijven en --- voor een lijn.</p>
+      <textarea id="reglementTekst" rows="15" style="width:100%;background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:14px;padding:12px;line-height:1.6"></textarea>
+      <div class="knoppenrij">
+        <button class="actie" id="btnReglementOpslaan">Reglement opslaan</button>
       </div>
-      <input type="file" id="reglementFile" accept=".pdf" style="display:none">
       <div class="status" id="reglementStatus"></div>
     </div>
   </section>
@@ -1633,67 +1632,58 @@ $('btnHofOpslaan').addEventListener('click', async ()=>{
 
 /* =============== reglement =============== */
 const REGLEMENT_API = '/.netlify/functions/reglement';
-let reglementPdf = null;
+let reglementTekst = '';
 
 async function laadReglement(){
   try{
     const r = await fetch(REGLEMENT_API, { cache:'no-store' });
     if(r.ok){
       const j = await r.json();
-      if(j.pdf) reglementPdf = j.pdf;
+      if(j.tekst) reglementTekst = j.tekst;
     }
   }catch(e){}
 }
 
 function renderReglement(){
   const houder = $('reglementViewer');
-  if(!reglementPdf){
-    houder.innerHTML = '<div class="leeg" style="padding:40px">Er is nog geen reglement geüpload.</div>';
-  } else {
-    houder.innerHTML = `<iframe src="data:application/pdf;base64,${reglementPdf}" style="width:100%;height:600px;border:none" title="ETH Scorito BBQ Reglement"></iframe>`;
+  const admin = $('reglementAdminCard');
+  admin.style.display = isAdmin ? 'block' : 'none';
+  if(isAdmin) $('reglementTekst').value = reglementTekst;
+  
+  if(!reglementTekst){
+    houder.innerHTML = 'Er is nog geen reglement ingesteld.';
+    return;
   }
-  const adminCard = $('reglementAdminCard');
-  adminCard.style.display = isAdmin ? 'block' : 'none';
+  // Eenvoudige opmaak: ** voor vet, --- voor lijn
+  let html = reglementTekst
+    .split('\n')
+    .map(regel=>{
+      if(regel.trim()==='---') return '<hr style="border:none;border-top:1px solid var(--line);margin:12px 0">';
+      return regel.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    })
+    .join('<br>');
+  houder.innerHTML = html;
 }
 
-function uploadReglementKoppel(){
-  const dz = $('reglementDropzone');
-  const fi = $('reglementFile');
-  const verwerk = file=>{
-    if(file.type !== 'application/pdf'){
-      toonStatus('reglementStatus','fout','Alleen PDF-bestanden worden ondersteund.');
-      return;
-    }
-    const r = new FileReader();
-    r.onload = async ()=>{
-      reglementPdf = r.result.split(',')[1]; // base64 zonder prefix
-      toonStatus('reglementStatus','info','<span class="laden"></span>Reglement wordt opgeslagen…');
-      try{
-        const resp = await fetch(REGLEMENT_API, {
-          method:'POST',
-          headers:{'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord||''},
-          body: JSON.stringify({ pdf: reglementPdf })
-        });
-        if(!resp.ok) throw new Error('status '+resp.status);
-        renderReglement();
-        toonStatus('reglementStatus','info','Reglement opgeslagen ✓ — je vrienden kunnen het nu zien.');
-      }catch(e){
-        toonStatus('reglementStatus','fout','Opslaan mislukt — probeer het opnieuw.');
-      }
-    };
-    r.onerror = ()=>toonStatus('reglementStatus','fout','Bestand lezen mislukt.');
-    r.readAsDataURL(file);
-  };
-  dz.addEventListener('click', ()=>fi.click());
-  dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('over');});
-  dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
-  dz.addEventListener('drop', e=>{
-    e.preventDefault(); dz.classList.remove('over');
-    if(e.dataTransfer.files.length) verwerk(e.dataTransfer.files[0]);
-  });
-  fi.addEventListener('change', ()=>{ if(fi.files.length) verwerk(fi.files[0]); });
-}
-uploadReglementKoppel();
+$('btnReglementOpslaan').addEventListener('click', async ()=>{
+  const tekst = $('reglementTekst').value;
+  if(!tekst.trim()){ toonStatus('reglementStatus','fout','Vul het reglement in.'); return; }
+  toonStatus('reglementStatus','info','<span class="laden"></span>Reglement wordt opgeslagen…');
+  try{
+    const r = await fetch(REGLEMENT_API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord||''},
+      body: JSON.stringify({ tekst })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.fout || 'status '+r.status);
+    reglementTekst = tekst;
+    renderReglement();
+    toonStatus('reglementStatus','info','Reglement opgeslagen ✓');
+  }catch(e){
+    toonStatus('reglementStatus','fout','Opslaan mislukt: '+e.message);
+  }
+});
 
 /* =============== het eredivisie orakel =============== */
 const ORAKEL_API = '/.netlify/functions/orakel';
