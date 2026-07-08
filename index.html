@@ -173,6 +173,19 @@
   .hof-rol{font-size:12.5px;color:var(--chalk-dim)}
   .hof-acties{grid-column:1 / -1;display:flex;gap:8px}
 
+  /* orakel */
+  .orakel-rij{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;
+    padding:8px 12px;margin-bottom:6px;background:var(--pitch-deep);cursor:grab;user-select:none}
+  .orakel-rij.sleept{opacity:.4;border-color:var(--amber)}
+  .orakel-rij .plek{font-family:'Barlow Condensed';font-weight:800;font-size:19px;width:30px;color:var(--chalk-dim);flex-shrink:0}
+  .orakel-rij:first-child .plek{color:var(--amber)}
+  .orakel-rij img{width:26px;height:26px;object-fit:contain;flex-shrink:0}
+  .orakel-rij .tnaam{font-weight:600;font-size:15px;flex:1}
+  .orakel-rij .pijlen{display:flex;gap:4px;flex-shrink:0}
+  .orakel-rij .pijlen button{background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--chalk-dim);
+    cursor:pointer;padding:4px 9px;font-size:13px}
+  .orakel-rij .pijlen button:hover{color:var(--amber);border-color:var(--amber)}
+
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
   .overlay.open{display:flex}
   .modal{background:var(--pitch-card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;max-width:380px;width:100%}
@@ -200,6 +213,7 @@
     <button class="tab actief" data-doel="p-standen">Standen</button>
     <button class="tab" data-doel="p-weken">Weekoverzicht</button>
     <button class="tab" data-doel="p-hof">Hall of Fame</button>
+    <button class="tab" data-doel="p-orakel">🔮 Het Eredivisie Orakel</button>
     <button class="tab verborgen adm" data-doel="p-upload">Ronde toevoegen</button>
     <button class="tab verborgen adm" data-doel="p-teams">Selecties</button>
     <button class="tab verborgen adm" data-doel="p-tips">Mail-tips</button>
@@ -292,6 +306,73 @@
     </div>
   </section>
 
+  <!-- ============ HET EREDIVISIE ORAKEL ============ -->
+  <section class="paneel" id="p-orakel">
+    <div class="card">
+      <h2>🔮 Het Eredivisie Orakel</h2>
+      <p class="uitleg">Voorspel vóór de aftrap van de eerste wedstrijd de <strong>volledige eindstand</strong> van de eredivisie én de <strong>top 3 topscorers</strong>. Puntentelling: 3 punten per team op exact de juiste plek, 1 punt als je er één plek naast zit, en <strong>+5 bonus voor de juiste kampioen</strong>. Topscorers: 5 punten per voorspelde speler die in de echte top 3 eindigt, en <strong>+5 extra als jouw nummer 1 dé topscorer wordt</strong>. Maximaal dus 79 punten. Je kunt je voorspelling tot de deadline aanpassen (opnieuw indienen overschrijft de vorige).</p>
+      <div class="status info zichtbaar" id="orakelDeadlineInfo" style="margin-top:0">Deadline wordt geladen…</div>
+      <div id="orakelFormulier" style="display:none">
+        <div class="rondekop">
+          <div style="min-width:220px">
+            <label for="orakelNaam">Wie ben jij?</label><br>
+            <select id="orakelNaam"></select>
+          </div>
+          <div id="orakelAndersWrap" style="display:none;min-width:220px;flex:1">
+            <label for="orakelAnders">Jouw naam</label><br>
+            <input type="text" id="orakelAnders" placeholder="Naam">
+          </div>
+        </div>
+        <h3>1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
+        <div id="orakelTeams"></div>
+        <h3 style="margin-top:20px">2 · Top 3 topscorers</h3>
+        <table class="editor" style="max-width:480px">
+          <tr><td style="width:36px;font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--amber)">1</td><td><input type="text" id="orakelTs1" placeholder="Dé topscorer"></td></tr>
+          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">2</td><td><input type="text" id="orakelTs2" placeholder="Nummer 2"></td></tr>
+          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">3</td><td><input type="text" id="orakelTs3" placeholder="Nummer 3"></td></tr>
+        </table>
+        <div class="knoppenrij">
+          <button class="actie" id="btnOrakelIndienen">🔮 Voorspelling indienen</button>
+        </div>
+        <div class="status" id="orakelStatus"></div>
+      </div>
+      <div class="leeg" id="orakelGesloten" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <h2>🏆 Orakel-stand</h2>
+      <p class="uitleg" id="orakelStandUitleg"></p>
+      <div id="orakelStandHouder"></div>
+    </div>
+
+    <div class="card" id="orakelAdminCard" style="display:none">
+      <h2>Orakel-beheer</h2>
+      <h3>Deadline (aftrap eerste wedstrijd)</h3>
+      <div class="rondekop">
+        <input type="datetime-local" id="orakelDeadlineInput" style="max-width:240px;background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px">
+        <button class="actie mini" id="btnOrakelDeadline">Deadline opslaan</button>
+      </div>
+      <h3 style="margin-top:18px">Teams (18)</h3>
+      <p class="uitleg">Haal de teams met logo's op via de football-data.org API (vereist FOOTBALL_DATA_KEY in Netlify), of plak hieronder handmatig één teamnaam per regel.</p>
+      <div class="knoppenrij" style="margin-top:0">
+        <button class="actie stil mini" id="btnOrakelTeamsApi">Teams ophalen via API</button>
+      </div>
+      <textarea id="orakelTeamsHandmatig" rows="5" placeholder="Ajax&#10;AZ&#10;Feyenoord&#10;…" style="width:100%;margin-top:10px;background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:14px;padding:9px 12px"></textarea>
+      <div class="knoppenrij">
+        <button class="actie stil mini" id="btnOrakelTeamsHandmatig">Handmatige lijst opslaan</button>
+      </div>
+      <h3 style="margin-top:18px">Publiceren</h3>
+      <p class="uitleg">Zolang de voorspellingen niet gepubliceerd zijn, ziet niemand elkaars lijstjes — alleen wíe er heeft ingediend. Publiceer zodra de eerste speelronde is begonnen.</p>
+      <div class="knoppenrij" style="margin-top:0">
+        <button class="actie mini" id="btnOrakelPubliceer"></button>
+        <button class="actie stil mini" id="btnOrakelVernieuwStand">Live stand nu verversen</button>
+      </div>
+      <h3 style="margin-top:18px">Ingediende voorspellingen</h3>
+      <div id="orakelAdminVoorspellingen"></div>
+      <div class="status" id="orakelAdminStatus"></div>
+    </div>
+  </section>
+
   <!-- ============ RONDE TOEVOEGEN (admin) ============ -->
   <section class="paneel" id="p-upload">
     <div class="card">
@@ -374,6 +455,11 @@
         </div>
         <div class="status" id="spSaveStatus"></div>
       </div>
+    </div>
+    <div class="card">
+      <h2>3 · Rondebeheer</h2>
+      <p class="uitleg">Alle ingevoerde rondes op een rij — bewerken of verwijderen kan hier direct. Verwijderen haalt zowel de weekstand als de spelerspunten van die ronde weg.</p>
+      <div id="rondeBeheer"></div>
     </div>
   </section>
 
@@ -475,6 +561,7 @@ function migreer(d){
   if(!d.teams) d.teams = {};
   if(!d.spelerpunten) d.spelerpunten = {};
   if(!d.halloffame) d.halloffame = [];
+  if(!d.orakel) d.orakel = { deadline:'', deadlineEpoch:null, gepubliceerd:false, teams:[] };
   Object.keys(d.rounds).forEach(nr=>{
     const r = d.rounds[nr];
     if(r && r.scores === undefined) d.rounds[nr] = { scores: r };
@@ -636,7 +723,51 @@ function optimaleOpstelling(spelers, superweekend){
 /* =============== renderen =============== */
 function renderAlles(){
   renderPrijzenkast(); renderStanden(); renderChart(); renderMatrix();
-  renderTeamsUI(); renderTips(); renderHof(); renderAdminUI();
+  renderTeamsUI(); renderTips(); renderHof(); renderRondeBeheer(); renderAdminUI();
+}
+
+/* ---------- rondebeheer ---------- */
+function renderRondeBeheer(){
+  const houder = $('rondeBeheer');
+  if(!houder) return;
+  // unie van rondes met een weekstand én rondes met alleen spelerspunten
+  const set = new Set(rondeNummers());
+  Object.keys(data.spelerpunten||{}).forEach(nr=>{
+    if(Object.keys(data.spelerpunten[nr]||{}).length) set.add(Number(nr));
+  });
+  const nrs = [...set].sort((a,b)=>a-b);
+  if(!nrs.length){ houder.innerHTML = '<div class="leeg">Nog geen rondes ingevoerd.</div>'; return; }
+  houder.innerHTML = `<table class="stand">
+    <tr><th>Ronde</th><th>Weekstand</th><th>Spelerspunten</th><th>Status</th><th></th></tr>
+    ${nrs.map(nr=>{
+      const r = data.rounds[nr];
+      const deelnemers = r ? Object.keys(r.scores).length : 0;
+      const spelers = Object.keys(data.spelerpunten[nr]||{}).length;
+      const status = [];
+      if(r && r.superweekend) status.push('⭐ Superweekend');
+      if(r && !r.telt) status.push('✕ Telt niet mee');
+      return `<tr>
+        <td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px">R${nr}</td>
+        <td style="color:var(--chalk-dim)">${deelnemers ? deelnemers+' deelnemers' : '—'}</td>
+        <td style="color:var(--chalk-dim)">${spelers ? spelers+' spelers' : '—'}</td>
+        <td style="color:var(--chalk-dim)">${status.join(' · ') || ''}</td>
+        <td style="text-align:right;white-space:nowrap">
+          ${deelnemers ? `<button class="actie stil mini rb-bewerk" data-ronde="${nr}">Bewerken</button> ` : ''}
+          <button class="actie gevaar mini rb-weg" data-ronde="${nr}">Verwijderen</button>
+        </td></tr>`;
+    }).join('')}
+  </table>`;
+  houder.querySelectorAll('.rb-bewerk').forEach(b=>b.addEventListener('click', ()=>openEditor(Number(b.dataset.ronde))));
+  houder.querySelectorAll('.rb-weg').forEach(b=>b.addEventListener('click', async ()=>{
+    const nr = Number(b.dataset.ronde);
+    if(!confirm('Ronde '+nr+' definitief verwijderen (weekstand én spelerspunten)?')) return;
+    delete data.rounds[nr];
+    delete data.spelerpunten[nr];
+    if(bewerkRonde === nr){ $('reviewCard').style.display='none'; bewerkRonde=null; }
+    await bewaarData('uploadStatus');
+    renderAlles();
+    toonStatus('uploadStatus','info','Ronde '+nr+' verwijderd ✓');
+  }));
 }
 
 /* ---------- prijzenkast ---------- */
@@ -874,7 +1005,9 @@ async function probeerLogin(){
       adminWachtwoord = pin;
       isAdmin = true;
       $('loginOverlay').classList.remove('open');
+      await laadOrakel();
       renderAlles();
+      renderOrakel();
       gaNaarTab('p-upload');
     } else if(resp.status === 401){
       toonStatus('loginStatus','fout','Onjuist wachtwoord.');
@@ -1394,6 +1527,302 @@ $('btnHofOpslaan').addEventListener('click', async ()=>{
   toonStatus('hofStatus','info','Opgeslagen ✓');
 });
 
+/* =============== het eredivisie orakel =============== */
+const ORAKEL_API = '/.netlify/functions/orakel';
+const STAND_API = '/.netlify/functions/stand';
+let orakelInfo = null;   // {deadline, deadlineEpoch, gepubliceerd, teams, namen, voorspellingen?}
+let liveStand = null;    // {stand:[{positie,naam,logo,punten}], scorers:[{naam,goals}], bijgewerkt}
+let orakelVolgorde = []; // huidige volgorde in het formulier (teamnamen)
+
+function normO(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+async function laadOrakel(){
+  try{
+    const headers = (isAdmin && adminWachtwoord) ? {'x-wachtwoord': adminWachtwoord} : {};
+    const r = await fetch(ORAKEL_API, { headers, cache:'no-store' });
+    if(r.ok) orakelInfo = await r.json();
+  }catch(e){ /* orakel nog niet beschikbaar */ }
+}
+async function laadLiveStand(){
+  try{
+    const r = await fetch(STAND_API, { cache:'no-store' });
+    if(r.ok){ const j = await r.json(); if(j && j.stand && j.stand.length) liveStand = j; }
+  }catch(e){}
+}
+
+function orakelScore(v){
+  const posEcht = {};
+  liveStand.stand.forEach(r=>{ posEcht[normO(r.naam)] = r.positie; });
+  let standPt = 0, kampioenGoed = false;
+  (v.volgorde||[]).forEach((team,i)=>{
+    const sleutel = normO(team);
+    let echt = posEcht[sleutel];
+    if(echt===undefined){
+      const k = Object.keys(posEcht).find(x=>x.includes(sleutel)||sleutel.includes(x));
+      if(k) echt = posEcht[k];
+    }
+    if(echt===undefined) return;
+    const voorspeld = i+1;
+    if(echt===voorspeld) standPt += 3;
+    else if(Math.abs(echt-voorspeld)===1) standPt += 1;
+    if(voorspeld===1 && echt===1){ standPt += 5; kampioenGoed = true; }
+  });
+  const top3 = (liveStand.scorers||[]).slice(0,3).map(s=>normO(s.naam));
+  let topPt = 0;
+  (v.topscorers||[]).forEach((naam,i)=>{
+    const n = normO(naam);
+    if(!n) return;
+    const inTop3 = top3.some(t=>t.includes(n)||n.includes(t));
+    if(inTop3) topPt += 5;
+    if(i===0 && top3[0] && (top3[0].includes(n)||n.includes(top3[0]))) topPt += 5;
+  });
+  return { standPt, topPt, totaal: standPt+topPt, kampioenGoed };
+}
+
+function renderOrakel(){
+  if(!$('orakelDeadlineInfo')) return;
+  const info = orakelInfo;
+  const deadlineInfo = $('orakelDeadlineInfo');
+  const open = info && info.deadlineEpoch && Date.now() < info.deadlineEpoch;
+
+  // deadline-balk
+  if(!info){ deadlineInfo.textContent = 'Het Orakel kan de server niet bereiken.'; }
+  else if(!info.deadlineEpoch){ deadlineInfo.textContent = 'De beheerder heeft de deadline nog niet ingesteld — nog even geduld.'; }
+  else if(open){
+    const ms = info.deadlineEpoch - Date.now();
+    const d = Math.floor(ms/86400000), u = Math.floor(ms%86400000/3600000), m = Math.floor(ms%3600000/60000);
+    deadlineInfo.textContent = '⏳ Voorspellen kan nog ' + (d>0? d+' dagen, ':'') + u + ' uur en ' + m + ' minuten (tot ' + new Date(info.deadlineEpoch).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'}) + ')';
+  } else {
+    deadlineInfo.textContent = '🔒 De deadline is verstreken — het seizoen is begonnen. Voorspellen kan niet meer.';
+  }
+
+  // formulier tonen/verbergen
+  const teams = info ? (info.teams||[]) : [];
+  $('orakelFormulier').style.display = (open && teams.length) ? 'block' : 'none';
+  $('orakelGesloten').style.display = (open && teams.length) ? 'none' : 'block';
+  $('orakelGesloten').textContent = !open && info && info.deadlineEpoch
+    ? 'De voorspellingen staan vast. Bekijk hieronder de Orakel-stand!'
+    : (open && !teams.length ? 'De teams zijn nog niet ingesteld door de beheerder.' : '');
+
+  if(open && teams.length){
+    // naam-dropdown
+    const sel = $('orakelNaam');
+    const huidig = sel.value;
+    const namen = alleDeelnemers();
+    sel.innerHTML = '<option value="">— kies je naam —</option>'
+      + namen.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
+      + '<option value="__anders__">Andere naam…</option>';
+    if(huidig && [...sel.options].some(o=>o.value===huidig)) sel.value = huidig;
+    // teamlijst initialiseren (alfabetisch) als die nog leeg is of niet meer klopt
+    const teamNamen = teams.map(t=>t.naam);
+    if(orakelVolgorde.length !== teamNamen.length || !orakelVolgorde.every(n=>teamNamen.includes(n))){
+      orakelVolgorde = [...teamNamen].sort((a,b)=>a.localeCompare(b,'nl'));
+    }
+    renderOrakelTeams();
+  }
+  renderOrakelStand();
+  renderOrakelAdmin();
+}
+
+function renderOrakelTeams(){
+  const teams = (orakelInfo && orakelInfo.teams) || [];
+  const logoVoor = {}; teams.forEach(t=>logoVoor[t.naam] = t.logo||'');
+  $('orakelTeams').innerHTML = orakelVolgorde.map((naam,i)=>`
+    <div class="orakel-rij" draggable="true" data-idx="${i}">
+      <span class="plek">${i+1}</span>
+      ${logoVoor[naam] ? `<img src="${esc(logoVoor[naam])}" alt="">` : ''}
+      <span class="tnaam">${esc(naam)}</span>
+      <span class="pijlen">
+        <button type="button" data-actie="op" data-idx="${i}" aria-label="Omhoog">▲</button>
+        <button type="button" data-actie="neer" data-idx="${i}" aria-label="Omlaag">▼</button>
+      </span>
+    </div>`).join('');
+  const houder = $('orakelTeams');
+  houder.querySelectorAll('button[data-actie]').forEach(b=>b.addEventListener('click', ()=>{
+    const i = Number(b.dataset.idx);
+    const j = b.dataset.actie==='op' ? i-1 : i+1;
+    if(j<0 || j>=orakelVolgorde.length) return;
+    [orakelVolgorde[i], orakelVolgorde[j]] = [orakelVolgorde[j], orakelVolgorde[i]];
+    renderOrakelTeams();
+  }));
+  let sleepIdx = null;
+  houder.querySelectorAll('.orakel-rij').forEach(rij=>{
+    rij.addEventListener('dragstart', ()=>{ sleepIdx = Number(rij.dataset.idx); rij.classList.add('sleept'); });
+    rij.addEventListener('dragend', ()=>{ rij.classList.remove('sleept'); });
+    rij.addEventListener('dragover', e=>e.preventDefault());
+    rij.addEventListener('drop', e=>{
+      e.preventDefault();
+      const doel = Number(rij.dataset.idx);
+      if(sleepIdx===null || sleepIdx===doel) return;
+      const [item] = orakelVolgorde.splice(sleepIdx,1);
+      orakelVolgorde.splice(doel,0,item);
+      sleepIdx = null;
+      renderOrakelTeams();
+    });
+  });
+}
+
+$('orakelNaam').addEventListener('change', ()=>{
+  $('orakelAndersWrap').style.display = $('orakelNaam').value==='__anders__' ? 'block' : 'none';
+});
+
+$('btnOrakelIndienen').addEventListener('click', async ()=>{
+  let naam = $('orakelNaam').value;
+  if(naam==='__anders__') naam = $('orakelAnders').value.trim();
+  if(!naam){ toonStatus('orakelStatus','fout','Kies eerst je naam.'); return; }
+  const topscorers = [$('orakelTs1').value.trim(), $('orakelTs2').value.trim(), $('orakelTs3').value.trim()];
+  if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Vul alle drie de topscorers in.'); return; }
+  toonStatus('orakelStatus','info','<span class="laden"></span>Voorspelling wordt ingediend…');
+  try{
+    const r = await fetch(ORAKEL_API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ deelnemer:naam, volgorde:orakelVolgorde, topscorers })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(r.ok){
+      toonStatus('orakelStatus','info','🔮 Voorspelling van '+esc(naam)+' opgeslagen! Je kunt hem tot de deadline nog aanpassen door opnieuw in te dienen.');
+      await laadOrakel();
+      renderOrakelStand();
+      renderOrakelAdmin();
+    } else {
+      toonStatus('orakelStatus','fout', j.fout || 'Indienen mislukt ('+r.status+').');
+    }
+  }catch(e){
+    toonStatus('orakelStatus','fout','Kan de server niet bereiken.');
+  }
+});
+
+function renderOrakelStand(){
+  const houder = $('orakelStandHouder');
+  const uitleg = $('orakelStandUitleg');
+  if(!orakelInfo){ houder.innerHTML=''; uitleg.textContent=''; return; }
+  if(!orakelInfo.gepubliceerd){
+    uitleg.textContent = 'De voorspellingen worden zichtbaar zodra de eerste speelronde is begonnen en de beheerder publiceert.';
+    const namen = orakelInfo.namen||[];
+    houder.innerHTML = namen.length
+      ? `<div class="leeg">Al ingediend (${namen.length}): ${namen.map(esc).join(', ')}</div>`
+      : '<div class="leeg">Nog niemand heeft een voorspelling ingediend.</div>';
+    return;
+  }
+  if(!liveStand){
+    uitleg.textContent = 'De live eredivisie-stand kon niet worden opgehaald — de Orakel-stand verschijnt zodra die beschikbaar is.';
+    houder.innerHTML = '';
+    return;
+  }
+  uitleg.textContent = 'Live bijgewerkt op basis van de actuele eredivisie-stand en topscorerslijst (ververst maximaal elke 6 uur, bron: football-data.org).';
+  const vs = orakelInfo.voorspellingen || {};
+  const rijen = Object.keys(vs).map(naam=>({ naam, ...orakelScore(vs[naam]), kampioenPick: (vs[naam].volgorde||[])[0]||'—' }))
+    .sort((a,b)=> b.totaal-a.totaal || a.naam.localeCompare(b.naam,'nl'));
+  if(!rijen.length){ houder.innerHTML = '<div class="leeg">Geen voorspellingen om te scoren.</div>'; return; }
+  const top3 = (liveStand.scorers||[]).slice(0,3);
+  houder.innerHTML = `<table class="stand">
+    <tr><th></th><th>Orakel</th><th>Kampioen-pick</th><th style="text-align:right">Stand</th><th style="text-align:right">Topscorers</th><th style="text-align:right">Totaal</th></tr>
+    ${rijen.map((r,i)=>`<tr class="${i===0?'p1':''}">
+      <td class="pos">${i+1}</td>
+      <td>${esc(r.naam)}</td>
+      <td style="color:var(--chalk-dim)">${esc(r.kampioenPick)}${r.kampioenGoed?' ✓':''}</td>
+      <td style="text-align:right">${r.standPt}</td>
+      <td style="text-align:right">${r.topPt}</td>
+      <td class="num">${r.totaal}</td></tr>`).join('')}
+  </table>
+  <div style="font-size:13px;color:var(--chalk-dim);margin-top:12px">
+    Actuele top 3: ${liveStand.stand.slice(0,3).map(t=>esc(t.naam)).join(' · ')}
+    &nbsp;|&nbsp; Topscorers: ${top3.map(s=>esc(s.naam)+' ('+s.goals+')').join(' · ')}
+  </div>`;
+}
+
+/* ---------- orakel: admin ---------- */
+function renderOrakelAdmin(){
+  const kaart = $('orakelAdminCard');
+  kaart.style.display = isAdmin ? 'block' : 'none';
+  if(!isAdmin) return;
+  if(data.orakel && data.orakel.deadline) $('orakelDeadlineInput').value = data.orakel.deadline;
+  $('btnOrakelPubliceer').textContent = (data.orakel && data.orakel.gepubliceerd)
+    ? '🔓 Gepubliceerd — klik om te verbergen' : '🔒 Nog verborgen — klik om te publiceren';
+  const vs = (orakelInfo && orakelInfo.voorspellingen) || {};
+  const namen = Object.keys(vs).sort((a,b)=>a.localeCompare(b,'nl'));
+  $('orakelAdminVoorspellingen').innerHTML = namen.length ? namen.map(n=>{
+    const v = vs[n];
+    return `<details style="margin-bottom:8px;border:1px solid var(--line);border-radius:10px;padding:10px 14px">
+      <summary style="cursor:pointer;font-weight:600">${esc(n)} <span style="color:var(--chalk-dim);font-size:13px">— kampioen: ${esc((v.volgorde||[])[0]||'?')} · topscorers: ${(v.topscorers||[]).map(esc).join(', ')}</span></summary>
+      <ol style="margin:10px 0 4px 22px;font-size:14px;line-height:1.7">${(v.volgorde||[]).map(t=>'<li>'+esc(t)+'</li>').join('')}</ol>
+    </details>`;
+  }).join('') : '<div class="leeg">Nog geen voorspellingen ingediend.</div>';
+}
+$('btnOrakelDeadline').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  const val = $('orakelDeadlineInput').value;
+  if(!val){ toonStatus('orakelAdminStatus','fout','Kies eerst een datum en tijd.'); return; }
+  data.orakel.deadline = val;
+  data.orakel.deadlineEpoch = new Date(val).getTime(); // jouw browser rekent de lokale tijd correct om
+  await bewaarData('orakelAdminStatus');
+  await laadOrakel();
+  renderOrakel();
+  toonStatus('orakelAdminStatus','info','Deadline opgeslagen ✓ — voorspellen kan tot precies dat moment.');
+});
+$('btnOrakelTeamsApi').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  toonStatus('orakelAdminStatus','info','<span class="laden"></span>Teams worden opgehaald via football-data.org…');
+  try{
+    const r = await fetch(STAND_API+'?actie=teams', { headers:{'x-wachtwoord': adminWachtwoord||''}, cache:'no-store' });
+    const j = await r.json();
+    if(!r.ok || !j.teams || !j.teams.length) throw new Error(j.fout || 'geen teams');
+    data.orakel.teams = j.teams;
+    await bewaarData('orakelAdminStatus');
+    await laadOrakel();
+    renderOrakel();
+    toonStatus('orakelAdminStatus','info',j.teams.length+' teams opgehaald en opgeslagen ✓ (met logo\'s)');
+  }catch(e){
+    toonStatus('orakelAdminStatus','fout','Ophalen mislukt: '+(e.message||'')+' — is FOOTBALL_DATA_KEY ingesteld in Netlify?');
+  }
+});
+$('btnOrakelTeamsHandmatig').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  const regels = $('orakelTeamsHandmatig').value.split('\n').map(r=>r.trim()).filter(Boolean);
+  if(regels.length < 2){ toonStatus('orakelAdminStatus','fout','Plak minimaal een paar teamnamen (één per regel).'); return; }
+  data.orakel.teams = regels.map(r=>({naam:r, logo:''}));
+  await bewaarData('orakelAdminStatus');
+  await laadOrakel();
+  renderOrakel();
+  toonStatus('orakelAdminStatus','info',regels.length+' teams opgeslagen ✓');
+});
+$('btnOrakelPubliceer').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  data.orakel.gepubliceerd = !data.orakel.gepubliceerd;
+  await bewaarData('orakelAdminStatus');
+  await laadOrakel();
+  if(data.orakel.gepubliceerd && !liveStand) await laadLiveStand();
+  renderOrakel();
+  toonStatus('orakelAdminStatus','info', data.orakel.gepubliceerd ? 'Voorspellingen gepubliceerd ✓ — iedereen kan ze nu zien.' : 'Voorspellingen weer verborgen.');
+});
+$('btnOrakelVernieuwStand').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  toonStatus('orakelAdminStatus','info','<span class="laden"></span>Live stand wordt ververst…');
+  try{
+    const r = await fetch(STAND_API+'?vernieuw=1', { headers:{'x-wachtwoord': adminWachtwoord||''}, cache:'no-store' });
+    const j = await r.json();
+    if(!r.ok || !j.stand) throw new Error(j.fout||'geen stand');
+    liveStand = j;
+    renderOrakelStand();
+    toonStatus('orakelAdminStatus','info','Live stand ververst ✓');
+  }catch(e){
+    toonStatus('orakelAdminStatus','fout','Verversen mislukt: '+(e.message||'')+' — is FOOTBALL_DATA_KEY ingesteld?');
+  }
+});
+// countdown elke 30 seconden bijwerken (alleen de tekstbalk; bij het verstrijken van de deadline volledig verversen)
+setInterval(()=>{
+  if(!orakelInfo || !orakelInfo.deadlineEpoch) return;
+  const open = Date.now() < orakelInfo.deadlineEpoch;
+  const formOpen = $('orakelFormulier').style.display !== 'none';
+  if(open !== formOpen){ renderOrakel(); return; }
+  if(open){
+    const ms = orakelInfo.deadlineEpoch - Date.now();
+    const d = Math.floor(ms/86400000), u = Math.floor(ms%86400000/3600000), m = Math.floor(ms%3600000/60000);
+    $('orakelDeadlineInfo').textContent = '⏳ Voorspellen kan nog ' + (d>0? d+' dagen, ':'') + u + ' uur en ' + m + ' minuten (tot ' + new Date(orakelInfo.deadlineEpoch).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'}) + ')';
+  }
+}, 30000);
+
 /* =============== mail-tips =============== */
 function tipData(nr, deelnemer){
   const team = data.teams[deelnemer];
@@ -1519,7 +1948,13 @@ function renderTipKaarten(){
 $('tipRonde').addEventListener('change', renderTipKaarten);
 
 /* =============== start =============== */
-(async ()=>{ await laadData(); renderAlles(); })();
+(async ()=>{
+  await laadData();
+  await laadOrakel();
+  if(orakelInfo && orakelInfo.gepubliceerd) await laadLiveStand();
+  renderAlles();
+  renderOrakel();
+})();
 </script>
 </body>
 </html>
