@@ -315,12 +315,12 @@
       <div id="orakelFormulier" style="display:none">
         <div class="rondekop">
           <div style="min-width:220px">
-            <label for="orakelNaam">Wie ben jij?</label><br>
+            <label for="orakelNaam">Jouw deelnemernaam</label><br>
             <select id="orakelNaam"></select>
           </div>
-          <div id="orakelAndersWrap" style="display:none;min-width:220px;flex:1">
-            <label for="orakelAnders">Jouw naam</label><br>
-            <input type="text" id="orakelAnders" placeholder="Naam">
+          <div id="orakelWachtwoordWrap" style="display:none;min-width:200px">
+            <label for="orakelWachtwoord">Wachtwoord</label><br>
+            <input type="password" id="orakelWachtwoord" placeholder="">
           </div>
         </div>
         <h3>1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
@@ -511,12 +511,22 @@
   <!-- ============ INSTELLINGEN (admin) ============ -->
   <section class="paneel" id="p-instellingen">
     <div class="card">
+      <h2>Deelnemers beheren</h2>
+      <p class="uitleg">Voeg deelnemers handmatig toe. Als je een wachtwoord instelt, moet dié persoon dat invullen als ze in het Orakel hun voorspelling doen — zo voorkom je dat iemand anders voor de grap als hen inlogt.</p>
+      <div class="rondekop">
+        <input type="text" id="nieuwDeelnemer" placeholder="Naam" style="min-width:160px">
+        <input type="password" id="nieuwWachtwoord" placeholder="Wachtwoord (optioneel)" style="min-width:180px">
+        <button class="actie mini" id="btnDeelnToevoegen">+ Toevoegen</button>
+      </div>
+      <div id="deelnemerLijst"></div>
+      <div class="status" id="deelnStatus"></div>
+    </div>
+    <div class="card">
       <h2>Instellingen</h2>
       <p class="uitleg">Het admin-wachtwoord wordt <strong>serverside</strong> gecontroleerd en staat als environment variable <strong>ADMIN_WACHTWOORD</strong> in Netlify (Site configuration → Environment variables). Wijzig je het daar, doe dan daarna Deploys → Trigger deploy — er staat dus nooit een wachtwoord in de code of in de browser.</p>
       <div class="knoppenrij">
         <button class="actie stil" id="btnUitloggen">Uitloggen</button>
       </div>
-      <div class="status" id="pinStatus"></div>
     </div>
   </section>
 
@@ -723,7 +733,7 @@ function optimaleOpstelling(spelers, superweekend){
 /* =============== renderen =============== */
 function renderAlles(){
   renderPrijzenkast(); renderStanden(); renderChart(); renderMatrix();
-  renderTeamsUI(); renderTips(); renderHof(); renderRondeBeheer(); renderAdminUI();
+  renderTeamsUI(); renderTips(); renderHof(); renderRondeBeheer(); renderDeelnemers(); renderAdminUI();
 }
 
 /* ---------- rondebeheer ---------- */
@@ -769,6 +779,66 @@ function renderRondeBeheer(){
     toonStatus('uploadStatus','info','Ronde '+nr+' verwijderd ✓');
   }));
 }
+
+/* ---------- deelnemers beheren ---------- */
+function renderDeelnemers(){
+  const houder = $('deelnemerLijst');
+  if(!houder) return;
+  const deelnemers = Object.keys(data.teams||{}).sort((a,b)=>a.localeCompare(b,'nl'));
+  if(!deelnemers.length){ houder.innerHTML = '<div class="leeg">Nog geen deelnemers.</div>'; return; }
+  houder.innerHTML = `<table class="stand" style="margin-top:12px">
+    <tr><th>Naam</th><th>E-mail</th><th>Wachtwoord</th><th></th></tr>
+    ${deelnemers.map(naam=>{
+      const team = data.teams[naam];
+      const heeftWw = !!(team.wachtwoord);
+      return `<tr>
+        <td>${esc(naam)}</td>
+        <td style="color:var(--chalk-dim);font-size:14px">${team.email ? esc(team.email) : '—'}</td>
+        <td style="color:var(--chalk-dim)">${heeftWw ? '✓ Ingesteld' : '—'}</td>
+        <td style="text-align:right">
+          <button class="actie stil mini deeln-bewerk" data-naam="${esc(naam)}">Bewerken</button>
+          <button class="actie gevaar mini deeln-weg" data-naam="${esc(naam)}">Verwijderen</button>
+        </td></tr>`;
+    }).join('')}
+  </table>`;
+  houder.querySelectorAll('.deeln-bewerk').forEach(b=>b.addEventListener('click', ()=>{
+    const naam = b.dataset.naam;
+    const team = data.teams[naam];
+    $('nieuwDeelnemer').value = naam;
+    $('nieuwWachtwoord').value = team.wachtwoord || '';
+    $('btnDeelnToevoegen').textContent = 'Wijzigingen opslaan';
+    $('nieuwDeelnemer').disabled = true;
+  }));
+  houder.querySelectorAll('.deeln-weg').forEach(b=>b.addEventListener('click', async ()=>{
+    const naam = b.dataset.naam;
+    if(!confirm('Deelnemer '+esc(naam)+' verwijderen (inclusief hun selectie)?')) return;
+    delete data.teams[naam];
+    await bewaarData('deelnStatus');
+    await laadOrakel();
+    renderDeelnemers();
+    renderOrakel();
+    renderTeamsUI();
+    toonStatus('deelnStatus','info','Deelnemer verwijderd ✓');
+  }));
+}
+$('btnDeelnToevoegen').addEventListener('click', async ()=>{
+  const naam = $('nieuwDeelnemer').value.trim();
+  const ww = $('nieuwWachtwoord').value;
+  if(!naam){ toonStatus('deelnStatus','fout','Vul de naam in.'); return; }
+  if(!data.teams) data.teams = {};
+  const isNieuw = !data.teams[naam];
+  data.teams[naam] = { email:'', squad:[], wachtwoord:ww };
+  await bewaarData('deelnStatus');
+  await laadOrakel();
+  $('nieuwDeelnemer').value = '';
+  $('nieuwWachtwoord').value = '';
+  $('btnDeelnToevoegen').textContent = '+ Toevoegen';
+  $('nieuwDeelnemer').disabled = false;
+  renderDeelnemers();
+  renderOrakel();
+  renderTeamsUI();
+  toonStatus('deelnStatus','info', isNieuw ? 'Deelnemer toegevoegd ✓' : 'Deelnemer bijgewerkt ✓');
+});
 
 /* ---------- prijzenkast ---------- */
 function renderPrijzenkast(){
@@ -1663,13 +1733,20 @@ function renderOrakelTeams(){
 }
 
 $('orakelNaam').addEventListener('change', ()=>{
-  $('orakelAndersWrap').style.display = $('orakelNaam').value==='__anders__' ? 'block' : 'none';
+  const naam = $('orakelNaam').value;
+  const team = data.teams && data.teams[naam];
+  const heeftWw = team && team.wachtwoord;
+  $('orakelWachtwoordWrap').style.display = heeftWw ? 'block' : 'none';
+  $('orakelWachtwoord').value = '';
+  if(!heeftWw) $('orakelWachtwoord').value = '';
 });
 
 $('btnOrakelIndienen').addEventListener('click', async ()=>{
-  let naam = $('orakelNaam').value;
-  if(naam==='__anders__') naam = $('orakelAnders').value.trim();
-  if(!naam){ toonStatus('orakelStatus','fout','Kies eerst je naam.'); return; }
+  const naam = $('orakelNaam').value;
+  if(!naam){ toonStatus('orakelStatus','fout','Kies je deelnemernaam.'); return; }
+  const team = data.teams && data.teams[naam];
+  const wachtwoord = team && team.wachtwoord ? $('orakelWachtwoord').value : '';
+  if(team && team.wachtwoord && !wachtwoord){ toonStatus('orakelStatus','fout','Vul je wachtwoord in.'); return; }
   const topscorers = [$('orakelTs1').value.trim(), $('orakelTs2').value.trim(), $('orakelTs3').value.trim()];
   if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Vul alle drie de topscorers in.'); return; }
   toonStatus('orakelStatus','info','<span class="laden"></span>Voorspelling wordt ingediend…');
@@ -1677,7 +1754,7 @@ $('btnOrakelIndienen').addEventListener('click', async ()=>{
     const r = await fetch(ORAKEL_API, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ deelnemer:naam, volgorde:orakelVolgorde, topscorers })
+      body: JSON.stringify({ deelnemer:naam, wachtwoord, volgorde:orakelVolgorde, topscorers })
     });
     const j = await r.json().catch(()=>({}));
     if(r.ok){
