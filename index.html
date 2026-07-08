@@ -515,7 +515,10 @@
       <p class="uitleg">Voeg deelnemers handmatig toe. Als je een wachtwoord instelt, moet dié persoon dat invullen als ze in het Orakel hun voorspelling doen — zo voorkom je dat iemand anders voor de grap als hen inlogt.</p>
       <div class="rondekop">
         <input type="text" id="nieuwDeelnemer" placeholder="Naam" style="min-width:160px">
-        <input type="password" id="nieuwWachtwoord" placeholder="Wachtwoord (optioneel)" style="min-width:180px">
+        <div style="position:relative;min-width:180px">
+          <input type="password" id="nieuwWachtwoord" placeholder="Wachtwoord (optioneel)" style="min-width:180px;padding-right:36px">
+          <button type="button" id="toggleWachtwoord" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--chalk-dim);cursor:pointer;font-size:16px">👁</button>
+        </div>
         <button class="actie mini" id="btnDeelnToevoegen">+ Toevoegen</button>
       </div>
       <div id="deelnemerLijst"></div>
@@ -781,6 +784,13 @@ function renderRondeBeheer(){
 }
 
 /* ---------- deelnemers beheren ---------- */
+$('toggleWachtwoord').addEventListener('click', ()=>{
+  const input = $('nieuwWachtwoord');
+  const isText = input.type === 'text';
+  input.type = isText ? 'password' : 'text';
+  $('toggleWachtwoord').textContent = isText ? '👁' : '👁‍🗨';
+});
+
 function renderDeelnemers(){
   const houder = $('deelnemerLijst');
   if(!houder) return;
@@ -790,11 +800,10 @@ function renderDeelnemers(){
     <tr><th>Naam</th><th>E-mail</th><th>Wachtwoord</th><th></th></tr>
     ${deelnemers.map(naam=>{
       const team = data.teams[naam];
-      const heeftWw = !!(team.wachtwoord);
       return `<tr>
         <td>${esc(naam)}</td>
         <td style="color:var(--chalk-dim);font-size:14px">${team.email ? esc(team.email) : '—'}</td>
-        <td style="color:var(--chalk-dim)">${heeftWw ? '✓ Ingesteld' : '—'}</td>
+        <td style="font-family:monospace;letter-spacing:0.5px;color:var(--chalk-dim)">${team.wachtwoord ? esc(team.wachtwoord) : '—'}</td>
         <td style="text-align:right">
           <button class="actie stil mini deeln-bewerk" data-naam="${esc(naam)}">Bewerken</button>
           <button class="actie gevaar mini deeln-weg" data-naam="${esc(naam)}">Verwijderen</button>
@@ -806,6 +815,8 @@ function renderDeelnemers(){
     const team = data.teams[naam];
     $('nieuwDeelnemer').value = naam;
     $('nieuwWachtwoord').value = team.wachtwoord || '';
+    $('nieuwWachtwoord').type = 'text'; // toon het wachtwoord bij bewerken
+    $('toggleWachtwoord').textContent = '👁‍🗨';
     $('btnDeelnToevoegen').textContent = 'Wijzigingen opslaan';
     $('nieuwDeelnemer').disabled = true;
   }));
@@ -832,6 +843,8 @@ $('btnDeelnToevoegen').addEventListener('click', async ()=>{
   await laadOrakel();
   $('nieuwDeelnemer').value = '';
   $('nieuwWachtwoord').value = '';
+  $('nieuwWachtwoord').type = 'password'; // verberg wachtwoord weer
+  $('toggleWachtwoord').textContent = '👁';
   $('btnDeelnToevoegen').textContent = '+ Toevoegen';
   $('nieuwDeelnemer').disabled = false;
   renderDeelnemers();
