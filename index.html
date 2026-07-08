@@ -213,6 +213,7 @@
     <button class="tab actief" data-doel="p-standen">Standen</button>
     <button class="tab" data-doel="p-weken">Weekoverzicht</button>
     <button class="tab" data-doel="p-hof">Hall of Fame</button>
+    <button class="tab" data-doel="p-reglement">📋 Reglement</button>
     <button class="tab" data-doel="p-orakel">🔮 Het Eredivisie Orakel</button>
     <button class="tab verborgen adm" data-doel="p-upload">Ronde toevoegen</button>
     <button class="tab verborgen adm" data-doel="p-teams">Selecties</button>
@@ -303,6 +304,24 @@
         <button class="actie stil" id="btnHofLeeg">Formulier leegmaken</button>
       </div>
       <div class="status" id="hofStatus"></div>
+    </div>
+  </section>
+
+  <!-- ============ REGLEMENT ============ -->
+  <section class="paneel" id="p-reglement">
+    <div class="card">
+      <h2>📋 ETH Scorito BBQ Reglement</h2>
+      <div id="reglementViewer" style="min-height:600px;background:var(--pitch-deep);border-radius:10px;overflow:hidden"></div>
+    </div>
+    <div class="card" id="reglementAdminCard" style="display:none">
+      <h2>Reglement beheren</h2>
+      <p class="uitleg">Upload het officiële PDF-reglement — dat zie je en je vrienden hierboven.</p>
+      <div style="border:2px dashed var(--line);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--pitch-deep)" id="reglementDropzone">
+        <div class="groot">📄 Sleep je PDF hierheen</div>
+        <div class="klein">of klik om een bestand te kiezen</div>
+      </div>
+      <input type="file" id="reglementFile" accept=".pdf" style="display:none">
+      <div class="status" id="reglementStatus"></div>
     </div>
   </section>
 
@@ -1088,8 +1107,10 @@ async function probeerLogin(){
       adminWachtwoord = pin;
       isAdmin = true;
       $('loginOverlay').classList.remove('open');
+      await laadReglement();
       await laadOrakel();
       renderAlles();
+      renderReglement();
       renderOrakel();
       gaNaarTab('p-upload');
     } else if(resp.status === 401){
@@ -1610,6 +1631,70 @@ $('btnHofOpslaan').addEventListener('click', async ()=>{
   toonStatus('hofStatus','info','Opgeslagen ✓');
 });
 
+/* =============== reglement =============== */
+const REGLEMENT_API = '/.netlify/functions/reglement';
+let reglementPdf = null;
+
+async function laadReglement(){
+  try{
+    const r = await fetch(REGLEMENT_API, { cache:'no-store' });
+    if(r.ok){
+      const j = await r.json();
+      if(j.pdf) reglementPdf = j.pdf;
+    }
+  }catch(e){}
+}
+
+function renderReglement(){
+  const houder = $('reglementViewer');
+  if(!reglementPdf){
+    houder.innerHTML = '<div class="leeg" style="padding:40px">Er is nog geen reglement geüpload.</div>';
+  } else {
+    houder.innerHTML = `<iframe src="data:application/pdf;base64,${reglementPdf}" style="width:100%;height:600px;border:none" title="ETH Scorito BBQ Reglement"></iframe>`;
+  }
+  const adminCard = $('reglementAdminCard');
+  adminCard.style.display = isAdmin ? 'block' : 'none';
+}
+
+function uploadReglementKoppel(){
+  const dz = $('reglementDropzone');
+  const fi = $('reglementFile');
+  const verwerk = file=>{
+    if(file.type !== 'application/pdf'){
+      toonStatus('reglementStatus','fout','Alleen PDF-bestanden worden ondersteund.');
+      return;
+    }
+    const r = new FileReader();
+    r.onload = async ()=>{
+      reglementPdf = r.result.split(',')[1]; // base64 zonder prefix
+      toonStatus('reglementStatus','info','<span class="laden"></span>Reglement wordt opgeslagen…');
+      try{
+        const resp = await fetch(REGLEMENT_API, {
+          method:'POST',
+          headers:{'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord||''},
+          body: JSON.stringify({ pdf: reglementPdf })
+        });
+        if(!resp.ok) throw new Error('status '+resp.status);
+        renderReglement();
+        toonStatus('reglementStatus','info','Reglement opgeslagen ✓ — je vrienden kunnen het nu zien.');
+      }catch(e){
+        toonStatus('reglementStatus','fout','Opslaan mislukt — probeer het opnieuw.');
+      }
+    };
+    r.onerror = ()=>toonStatus('reglementStatus','fout','Bestand lezen mislukt.');
+    r.readAsDataURL(file);
+  };
+  dz.addEventListener('click', ()=>fi.click());
+  dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('over');});
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('over');
+    if(e.dataTransfer.files.length) verwerk(e.dataTransfer.files[0]);
+  });
+  fi.addEventListener('change', ()=>{ if(fi.files.length) verwerk(fi.files[0]); });
+}
+uploadReglementKoppel();
+
 /* =============== het eredivisie orakel =============== */
 const ORAKEL_API = '/.netlify/functions/orakel';
 const STAND_API = '/.netlify/functions/stand';
@@ -2040,9 +2125,11 @@ $('tipRonde').addEventListener('change', renderTipKaarten);
 /* =============== start =============== */
 (async ()=>{
   await laadData();
+  await laadReglement();
   await laadOrakel();
   if(orakelInfo && orakelInfo.gepubliceerd) await laadLiveStand();
   renderAlles();
+  renderReglement();
   renderOrakel();
 })();
 </script>
