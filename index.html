@@ -1999,14 +1999,13 @@ function renderOrakelAdmin(){
     const naam = b.dataset.naam;
     if(!confirm('Voorspelling van '+esc(naam)+' verwijderen?')) return;
     try{
-      const vs = (orakelInfo && orakelInfo.voorspellingen) || {};
-      delete vs[naam];
       const r = await fetch(ORAKEL_API+'?verwijder=1', {
         method:'POST',
         headers:{'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord||''},
-        body: JSON.stringify({ voorspellingen: vs })
+        body: JSON.stringify({ naam })
       });
-      if(!r.ok) throw new Error('status '+r.status);
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j.fout || 'status '+r.status);
       await laadOrakel();
       renderOrakelAdmin();
       renderOrakelStand();

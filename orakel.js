@@ -4,7 +4,7 @@
 // - Als een deelnemer een wachtwoord heeft, moet dat kloppen voordat de voorspelling
 //   wordt aanvaard (voorkomt dat iemand als een ander inlogt).
 // - Voorspellingen van anderen zijn pas zichtbaar als de admin publiceert.
-// - De admin (met x-wachtwoord) ziet altijd alles.
+// - De admin (met x-wachtwoord) kan voorspellingen verwijderen.
 import { getStore } from "@netlify/blobs";
 
 export default async (req) => {
@@ -12,7 +12,7 @@ export default async (req) => {
   const hoofd = await store.get("poule", { type: "json" });
   const instellingen = (hoofd && hoofd.orakel) || {};
   const teams = hoofd && hoofd.teams ? hoofd.teams : {};
-  const voorspellingen = (await store.get("orakel", { type: "json" })) || {};
+  let voorspellingen = (await store.get("orakel", { type: "json" })) || {};
   const isAdminReq = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
@@ -29,6 +29,35 @@ export default async (req) => {
   }
 
   if (req.method === "POST") {
+    // Admin-only: voorspellingen verwijderen
+    if (req.url.includes("verwijder=1")) {
+      if (!isAdminReq) {
+        return Response.json({ fout: "Alleen admin kan verwijderen." }, { status: 401 });
+      }
+      let body;
+      try { body = await req.json(); } catch (e) {
+        console.error("JSON parse:", e.message);
+        return Response.json({ fout: "Verzoek kon niet worden gelezen." }, { status: 400 });
+      }
+      const { naam } = body || {};
+      if (!naam || typeof naam !== "string") {
+        return Response.json({ fout: "Geen deelnemer opgegeven." }, { status: 400 });
+      }
+      try {
+        // Huidige voorspellingen ophalen
+        const huidig = (await store.get("orakel", { type: "json" })) || {};
+        // Verwijder de entry
+        delete huidig[naam];
+        // Sla terug op
+        await store.setJSON("orakel", huidig);
+        return Response.json({ ok: true });
+      } catch (e) {
+        console.error("Verwijderen:", e.message);
+        return Response.json({ fout: "Verwijderen mislukt." }, { status: 500 });
+      }
+    }
+
+    // Normale indiening door deelnemer
     let body;
     try { body = await req.json(); } catch { body = null; }
     const { deelnemer, wachtwoord, volgorde, topscorers } = body || {};
