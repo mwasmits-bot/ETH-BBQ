@@ -2,8 +2,13 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#123B2A">
+<meta name="description" content="ETH Scorito BBQ — Eredivisie poule, mail-tips en Hall of Fame">
 <title>ETH Scorito BBQ — Weekprijzen Dashboard</title>
+<link rel="icon" href="/eth.png" type="image/png">
+<link rel="apple-touch-icon" href="/eth.png">
+<link rel="manifest" href="/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -198,8 +203,11 @@
 
   <header>
     <div>
-      <div class="kicker">Scorito · Vriendenpoule</div>
-      <h1>ETH Scorito BBQ</h1>
+      <img src="/eth.png" alt="ETH Scorito BBQ" style="width:48px;height:48px;object-fit:contain;margin-right:12px;margin-bottom:-8px">
+      <div>
+        <div class="kicker">Scorito · Vriendenpoule</div>
+        <h1>ETH Scorito BBQ</h1>
+      </div>
     </div>
     <div class="header-rechts">
       <div class="season-chip">Seizoen 2026 / 27</div>
@@ -1978,10 +1986,35 @@ function renderOrakelAdmin(){
   $('orakelAdminVoorspellingen').innerHTML = namen.length ? namen.map(n=>{
     const v = vs[n];
     return `<details style="margin-bottom:8px;border:1px solid var(--line);border-radius:10px;padding:10px 14px">
-      <summary style="cursor:pointer;font-weight:600">${esc(n)} <span style="color:var(--chalk-dim);font-size:13px">— kampioen: ${esc((v.volgorde||[])[0]||'?')} · topscorers: ${(v.topscorers||[]).map(esc).join(', ')}</span></summary>
+      <summary style="cursor:pointer;font-weight:600;display:flex;justify-content:space-between;align-items:center">
+        <span>${esc(n)} <span style="color:var(--chalk-dim);font-size:13px">— kampioen: ${esc((v.volgorde||[])[0]||'?')} · topscorers: ${(v.topscorers||[]).map(esc).join(', ')}</span></span>
+        <button class="actie gevaar mini orakel-delVoorspelling" data-naam="${esc(n)}" style="margin-left:10px">Verwijderen</button>
+      </summary>
       <ol style="margin:10px 0 4px 22px;font-size:14px;line-height:1.7">${(v.volgorde||[]).map(t=>'<li>'+esc(t)+'</li>').join('')}</ol>
     </details>`;
   }).join('') : '<div class="leeg">Nog geen voorspellingen ingediend.</div>';
+  
+  $('orakelAdminVoorspellingen').querySelectorAll('.orakel-delVoorspelling').forEach(b=>b.addEventListener('click', async (e)=>{
+    e.stopPropagation(); // voorkom dat details opent
+    const naam = b.dataset.naam;
+    if(!confirm('Voorspelling van '+esc(naam)+' verwijderen?')) return;
+    try{
+      const vs = (orakelInfo && orakelInfo.voorspellingen) || {};
+      delete vs[naam];
+      const r = await fetch(ORAKEL_API+'?verwijder=1', {
+        method:'POST',
+        headers:{'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord||''},
+        body: JSON.stringify({ voorspellingen: vs })
+      });
+      if(!r.ok) throw new Error('status '+r.status);
+      await laadOrakel();
+      renderOrakelAdmin();
+      renderOrakelStand();
+      toonStatus('orakelAdminStatus','info','Voorspelling van '+esc(naam)+' verwijderd ✓');
+    }catch(e){
+      toonStatus('orakelAdminStatus','fout','Verwijderen mislukt: '+e.message);
+    }
+  }));
 }
 $('btnOrakelDeadline').addEventListener('click', async ()=>{
   if(!isAdmin) return;

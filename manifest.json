@@ -1,0 +1,42 @@
+{
+  "name": "ETH Scorito BBQ",
+  "short_name": "Scorito BBQ",
+  "description": "Eredivisie poule met weekprijzen, Orakel en Hall of Fame",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#123B2A",
+  "theme_color": "#123B2A",
+  "icons": [
+    {
+      "src": "/eth.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/eth.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/eth.png",
+      "sizes": "540x720",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["sports"],
+  "shortcuts": [
+    {
+      "name": "Orakel",
+      "short_name": "Orakel",
+      "description": "Het Eredivisie Orakel",
+      "url": "/#orakel",
+      "icons": [{ "src": "/eth.png", "sizes": "any" }]
+    }
+  ]
+}
