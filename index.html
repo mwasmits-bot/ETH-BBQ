@@ -1803,7 +1803,7 @@ function renderTopscorersUI(){
         <div style="flex:1">
           <select class="topscorer-speler" data-index="${i}" ${!ts.club?'disabled':''}>
             <option value="">— Speler —</option>
-            ${(ts.club && orakelSpelers[ts.club])?orakelSpelers[ts.club].map(s=>`<option value="${s}" ${ts.speler===s?'selected':''}>${s}</option>`).join(''):''
+            ${(ts.club && orakelSpelers[ts.club])?orakelSpelers[ts.club].map(s=>`<option value="${s}" ${ts.speler===s?'selected':''}>${s}</option>`).join(''):''}
           </select>
         </div>
       </div>
