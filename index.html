@@ -1781,11 +1781,17 @@ async function laadOrakelSpelers(club){
   if(orakelSpelers[club]) return;
   try{
     const r = await fetch(STAND_API+'?actie=squad&team='+encodeURIComponent(club), {cache:'no-store'});
-    if(r.ok){
-      const j = await r.json();
-      orakelSpelers[club] = (j.spelers||[]).map(s=>s.naam).sort();
+    const j = await r.json().catch(()=>({}));
+    console.log('Squad response voor', club, ':', r.status, j);
+    if(r.ok && Array.isArray(j.spelers) && j.spelers.length){
+      orakelSpelers[club] = j.spelers.map(s=>s.naam).sort();
+    } else {
+      toonStatus('orakelStatus','fout','Spelers van '+esc(club)+' laden mislukt: '+(j.fout || 'leeg antwoord ('+r.status+')'));
     }
-  }catch(e){}
+  }catch(e){
+    console.error('Squad fout:', e);
+    toonStatus('orakelStatus','fout','Spelers laden mislukt: '+e.message);
+  }
 }
 
 function renderTopscorersUI(){
