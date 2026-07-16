@@ -50,7 +50,7 @@ export default async (req) => {
     }
 
     if (actie === "squad" && teamNaam) {
-      const cacheKey = `fd-squad-${teamNaam}`;
+      const cacheKey = `fd-squad2-${teamNaam}`;
       if (vernieuw) await store.delete(cacheKey);
       const squad = await cachedGet(
         store,
