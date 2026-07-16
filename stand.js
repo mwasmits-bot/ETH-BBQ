@@ -1,69 +1,88 @@
-// Live eredivisie-stand en topscorers via football-data.org (gratis tier, competitie DED).
-// Vereist environment variable FOOTBALL_DATA_KEY (gratis key via football-data.org registratie).
-// Resultaten worden 6 uur gecachet (teamlijst 24 uur) zodat je ruim binnen de
-// gratis limiet van 10 requests/minuut blijft — hoeveel vrienden er ook kijken.
-// ?actie=teams        → teamlijst met logo's (voor het Orakel-formulier)
-// ?vernieuw=1 + admin → cache negeren en direct verversen
+// Football-data.org proxy via Netlify Functions.
+// GET /api/stand = eindstand (6h cache)
+// GET /api/stand?actie=teams = 18 Eredivisie-teams (24h cache)
+// GET /api/stand?actie=squad&team=Ajax = spelers van Ajax (24h cache)
 import { getStore } from "@netlify/blobs";
 
-const UUR = 3600 * 1000;
-const FD = "https://api.football-data.org/v4/competitions/DED";
+const FOOTBALL_API = "https://api.football-data.org/v4";
+const EREDIVISIE_ID = "DED";
+const KEY = process.env.FOOTBALL_DATA_KEY || "";
+
+async function fetchFootball(url) {
+  const r = await fetch(url, { headers: { "X-Auth-Token": KEY } });
+  if (!r.ok) throw new Error(`Football API: ${r.status}`);
+  return r.json();
+}
+
+async function cachedGet(store, key, fetchFn, ttlMinutes) {
+  const cached = await store.get(key, { type: "json" });
+  const now = Date.now();
+  if (cached && cached.ts && now - cached.ts < ttlMinutes * 60 * 1000) {
+    return cached.data;
+  }
+  const data = await fetchFn();
+  await store.set(key, JSON.stringify({ ts: now, data }));
+  return data;
+}
 
 export default async (req) => {
-  const url = new URL(req.url);
   const store = getStore("eth-scorito-bbq");
-  const key = process.env.FOOTBALL_DATA_KEY;
   const isAdminReq = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
-  // ---------- teamlijst met logo's ----------
-  if (url.searchParams.get("actie") === "teams") {
-    const cache = await store.get("fd-teams", { type: "json" });
-    if (cache && Date.now() - cache.tijd < 24 * UUR && !isAdminReq) return Response.json(cache);
-    if (!key) return cache ? Response.json(cache)
-      : Response.json({ fout: "FOOTBALL_DATA_KEY is niet ingesteld in Netlify." }, { status: 500 });
-    const r = await fetch(FD + "/teams", { headers: { "X-Auth-Token": key } });
-    if (!r.ok) return cache ? Response.json(cache)
-      : Response.json({ fout: "football-data.org gaf een fout (" + r.status + ")." }, { status: 502 });
-    const j = await r.json();
-    const uit = {
-      tijd: Date.now(),
-      teams: (j.teams || [])
-        .map(t => ({ naam: t.shortName || t.name, logo: t.crest || "" }))
-        .sort((a, b) => a.naam.localeCompare(b.naam, "nl"))
-    };
-    await store.setJSON("fd-teams", uit);
-    return Response.json(uit);
-  }
-
-  // ---------- stand + topscorers ----------
-  const cache = await store.get("fd-stand", { type: "json" });
+  const url = new URL(req.url);
+  const actie = url.searchParams.get("actie");
   const vernieuw = url.searchParams.get("vernieuw") === "1" && isAdminReq;
-  if (cache && Date.now() - cache.tijd < 6 * UUR && !vernieuw) return Response.json(cache);
-  if (!key) return cache ? Response.json(cache)
-    : Response.json({ fout: "FOOTBALL_DATA_KEY is niet ingesteld in Netlify." }, { status: 500 });
+  const teamNaam = url.searchParams.get("team");
 
-  const [rs, rt] = await Promise.all([
-    fetch(FD + "/standings", { headers: { "X-Auth-Token": key } }),
-    fetch(FD + "/scorers?limit=10", { headers: { "X-Auth-Token": key } })
-  ]);
-  if (!rs.ok || !rt.ok) return cache ? Response.json(cache)
-    : Response.json({ fout: "football-data.org gaf een fout (" + rs.status + "/" + rt.status + ")." }, { status: 502 });
+  try {
+    if (actie === "teams") {
+      const cacheKey = "fd-teams";
+      if (vernieuw) await store.delete(cacheKey);
+      const data = await cachedGet(
+        store,
+        cacheKey,
+        () => fetchFootball(`${FOOTBALL_API}/competitions/${EREDIVISIE_ID}/teams`),
+        24 * 60
+      );
+      const teams = (data.teams || []).map(t => ({ naam: t.name, logo: t.crest }));
+      return Response.json({ teams }, { headers: { "cache-control": "public, max-age=86400" } });
+    }
 
-  const js = await rs.json();
-  const jt = await rt.json();
-  const tabel = ((js.standings || []).find(s => s.type === "TOTAL") || {}).table || [];
-  const uit = {
-    tijd: Date.now(),
-    bijgewerkt: new Date().toISOString(),
-    stand: tabel.map(r => ({
-      positie: r.position,
-      naam: r.team.shortName || r.team.name,
-      logo: r.team.crest || "",
-      punten: r.points
-    })),
-    scorers: (jt.scorers || []).map(s => ({ naam: s.player.name, goals: s.goals }))
-  };
-  await store.setJSON("fd-stand", uit);
-  return Response.json(uit);
+    if (actie === "squad" && teamNaam) {
+      const cacheKey = `fd-squad-${teamNaam}`;
+      if (vernieuw) await store.delete(cacheKey);
+      const data = await cachedGet(
+        store,
+        cacheKey,
+        async () => {
+          // Eerst alle teams ophalen
+          const teamsData = await fetchFootball(`${FOOTBALL_API}/competitions/${EREDIVISIE_ID}/teams`);
+          const team = (teamsData.teams || []).find(t => t.name === teamNaam);
+          if (!team) throw new Error(`Team ${teamNaam} niet gevonden`);
+          return team;
+        },
+        24 * 60
+      );
+      const spelers = (data.squad || []).map(p => ({ naam: p.name, nummer: p.shirtNumber }));
+      return Response.json({ team: teamNaam, spelers }, { headers: { "cache-control": "public, max-age=86400" } });
+    }
+
+    // Default: eindstand
+    const cacheKey = "fd-stand";
+    if (vernieuw) await store.delete(cacheKey);
+    const data = await cachedGet(
+      store,
+      cacheKey,
+      () => fetchFootball(`${FOOTBALL_API}/competitions/${EREDIVISIE_ID}/standings`),
+      6 * 60
+    );
+    return Response.json(data, { headers: { "cache-control": "public, max-age=21600" } });
+  } catch (e) {
+    console.error("Football API error:", e.message);
+    return Response.json(
+      { fout: e.message },
+      { status: 500, headers: { "cache-control": "no-store" } }
+    );
+  }
 };

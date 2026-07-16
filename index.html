@@ -352,11 +352,8 @@
         <h3>1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
         <div id="orakelTeams"></div>
         <h3 style="margin-top:20px">2 · Top 3 topscorers</h3>
-        <table class="editor" style="max-width:480px">
-          <tr><td style="width:36px;font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--amber)">1</td><td><input type="text" id="orakelTs1" placeholder="Dé topscorer"></td></tr>
-          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">2</td><td><input type="text" id="orakelTs2" placeholder="Nummer 2"></td></tr>
-          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">3</td><td><input type="text" id="orakelTs3" placeholder="Nummer 3"></td></tr>
-        </table>
+        <p class="uitleg" style="font-size:14px">Kies per topscorer eerst de club, dan de speler.</p>
+        <div id="topscorersContainer"></div>
         <div class="knoppenrij">
           <button class="actie" id="btnOrakelIndienen">🔮 Voorspelling indienen</button>
         </div>
@@ -1116,6 +1113,7 @@ async function probeerLogin(){
       $('loginOverlay').classList.remove('open');
       await laadReglement();
       await laadOrakel();
+      await laadOrakelTeams();
       renderAlles();
       renderReglement();
       renderOrakel();
@@ -1764,6 +1762,80 @@ $('btnReglementOpslaan').addEventListener('click', async ()=>{
 /* =============== het eredivisie orakel =============== */
 const ORAKEL_API = '/.netlify/functions/orakel';
 const STAND_API = '/.netlify/functions/stand';
+let orakelInfo = null;
+let orakelTeams = [];
+let orakelSpelers = {}; // { "Ajax": [...], "PSV": [...] }
+let orakelTopscorers = [{club:'',speler:''}, {club:'',speler:''}, {club:'',speler:''}];
+
+async function laadOrakelTeams(){
+  try{
+    const r = await fetch(STAND_API+'?actie=teams', {cache:'no-store'});
+    if(r.ok){
+      const j = await r.json();
+      orakelTeams = (j.teams||[]).map(t=>t.naam);
+    }
+  }catch(e){}
+}
+
+async function laadOrakelSpelers(club){
+  if(orakelSpelers[club]) return;
+  try{
+    const r = await fetch(STAND_API+'?actie=squad&team='+encodeURIComponent(club), {cache:'no-store'});
+    if(r.ok){
+      const j = await r.json();
+      orakelSpelers[club] = (j.spelers||[]).map(s=>s.naam).sort();
+    }
+  }catch(e){}
+}
+
+function renderTopscorersUI(){
+  const houder = $('topscorersContainer');
+  houder.innerHTML = orakelTopscorers.map((ts, i)=>`
+    <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:600;margin-bottom:8px">${i+1}. Topscorer</div>
+      <div class="rondekop">
+        <div style="flex:1">
+          <select class="topscorer-club" data-index="${i}">
+            <option value="">— Club —</option>
+            ${orakelTeams.map(t=>`<option value="${t}" ${ts.club===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1">
+          <select class="topscorer-speler" data-index="${i}" ${!ts.club?'disabled':''}>
+            <option value="">— Speler —</option>
+            ${(ts.club && orakelSpelers[ts.club])?orakelSpelers[ts.club].map(s=>`<option value="${s}" ${ts.speler===s?'selected':''}>${s}</option>`).join(''):''
+          </select>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  
+  houder.querySelectorAll('.topscorer-club').forEach(sel=>sel.addEventListener('change', async ()=>{
+    const i = parseInt(sel.dataset.index);
+    const club = sel.value;
+    orakelTopscorers[i].club = club;
+    orakelTopscorers[i].speler = '';
+    if(club) await laadOrakelSpelers(club);
+    renderTopscorersUI();
+  }));
+  
+  houder.querySelectorAll('.topscorer-speler').forEach(sel=>sel.addEventListener('change', ()=>{
+    const i = parseInt(sel.dataset.index);
+    orakelTopscorers[i].speler = sel.value;
+  }));
+}
+
+async function laadOrakel(){
+  try{
+    const r = await fetch(ORAKEL_API, { cache:'no-store' });
+    if(r.ok){
+      orakelInfo = await r.json();
+    }
+  }catch(e){}
+}
+
+const ORAKEL_API = '/.netlify/functions/orakel';
+const STAND_API = '/.netlify/functions/stand';
 let orakelInfo = null;   // {deadline, deadlineEpoch, gepubliceerd, teams, namen, voorspellingen?}
 let liveStand = null;    // {stand:[{positie,naam,logo,punten}], scorers:[{naam,goals}], bijgewerkt}
 let orakelVolgorde = []; // huidige volgorde in het formulier (teamnamen)
@@ -1818,6 +1890,10 @@ function renderOrakel(){
   const info = orakelInfo;
   const deadlineInfo = $('orakelDeadlineInfo');
   const open = info && info.deadlineEpoch && Date.now() < info.deadlineEpoch;
+
+  // Zorg dat teams geladen zijn
+  if(orakelTeams.length === 0) laadOrakelTeams();
+  renderTopscorersUI();
 
   // deadline-balk
   if(!info){ deadlineInfo.textContent = 'Het Orakel kan de server niet bereiken.'; }
@@ -1911,8 +1987,8 @@ $('btnOrakelIndienen').addEventListener('click', async ()=>{
   const team = data.teams && data.teams[naam];
   const wachtwoord = team && team.wachtwoord ? $('orakelWachtwoord').value : '';
   if(team && team.wachtwoord && !wachtwoord){ toonStatus('orakelStatus','fout','Vul je wachtwoord in.'); return; }
-  const topscorers = [$('orakelTs1').value.trim(), $('orakelTs2').value.trim(), $('orakelTs3').value.trim()];
-  if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Vul alle drie de topscorers in.'); return; }
+  const topscorers = orakelTopscorers.map(ts=>ts.speler).filter(Boolean);
+  if(topscorers.length < 3){ toonStatus('orakelStatus','fout','Selecteer alle drie de topscorers.'); return; }
   toonStatus('orakelStatus','info','<span class="laden"></span>Voorspelling wordt ingediend…');
   try{
     const r = await fetch(ORAKEL_API, {
@@ -1999,18 +2075,24 @@ function renderOrakelAdmin(){
     const naam = b.dataset.naam;
     if(!confirm('Voorspelling van '+esc(naam)+' verwijderen?')) return;
     try{
+      console.log('Delete aanvraag:', { naam, wachtwoord: adminWachtwoord ? '***' : 'geen' });
+      const payload = JSON.stringify({ naam });
+      console.log('JSON payload:', payload);
       const r = await fetch(ORAKEL_API+'?verwijder=1', {
         method:'POST',
         headers:{'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord||''},
-        body: JSON.stringify({ naam })
+        body: payload
       });
-      const j = await r.json().catch(()=>({}));
+      console.log('Response status:', r.status);
+      const j = await r.json().catch((e)=>{ console.error('JSON parse fout:', e); return {}; });
+      console.log('Response body:', j);
       if(!r.ok) throw new Error(j.fout || 'status '+r.status);
       await laadOrakel();
       renderOrakelAdmin();
       renderOrakelStand();
       toonStatus('orakelAdminStatus','info','Voorspelling van '+esc(naam)+' verwijderd ✓');
     }catch(e){
+      console.error('Delete fout:', e);
       toonStatus('orakelAdminStatus','fout','Verwijderen mislukt: '+e.message);
     }
   }));
@@ -2217,6 +2299,7 @@ $('tipRonde').addEventListener('change', renderTipKaarten);
   await laadData();
   await laadReglement();
   await laadOrakel();
+  await laadOrakelTeams();
   if(orakelInfo && orakelInfo.gepubliceerd) await laadLiveStand();
   renderAlles();
   renderReglement();
