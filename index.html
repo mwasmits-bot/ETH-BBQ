@@ -1834,9 +1834,6 @@ async function laadOrakel(){
   }catch(e){}
 }
 
-const ORAKEL_API = '/.netlify/functions/orakel';
-const STAND_API = '/.netlify/functions/stand';
-let orakelInfo = null;   // {deadline, deadlineEpoch, gepubliceerd, teams, namen, voorspellingen?}
 let liveStand = null;    // {stand:[{positie,naam,logo,punten}], scorers:[{naam,goals}], bijgewerkt}
 let orakelVolgorde = []; // huidige volgorde in het formulier (teamnamen)
 
