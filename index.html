@@ -352,8 +352,12 @@
         <h3>1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
         <div id="orakelTeams"></div>
         <h3 style="margin-top:20px">2 · Top 3 topscorers</h3>
-        <p class="uitleg" style="font-size:14px">Kies per topscorer eerst de club, dan de speler.</p>
-        <div id="topscorersContainer"></div>
+        <p class="uitleg" style="font-size:14px">Typ de namen van de drie spelers die volgens jou de meeste doelpunten maken. Schrijf ze zo volledig mogelijk (bijv. "Brian Brobbey").</p>
+        <table class="editor" style="max-width:480px">
+          <tr><td style="width:36px;font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--amber)">1</td><td><input type="text" id="orakelTs1" placeholder="Dé topscorer"></td></tr>
+          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">2</td><td><input type="text" id="orakelTs2" placeholder="Nummer 2"></td></tr>
+          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">3</td><td><input type="text" id="orakelTs3" placeholder="Nummer 3"></td></tr>
+        </table>
         <div class="knoppenrij">
           <button class="actie" id="btnOrakelIndienen">🔮 Voorspelling indienen</button>
         </div>
@@ -393,6 +397,16 @@
       <h3 style="margin-top:18px">Ingediende voorspellingen</h3>
       <div id="orakelAdminVoorspellingen"></div>
       <div class="status" id="orakelAdminStatus"></div>
+
+      <h3 style="margin-top:22px">Topscorers koppelen</h3>
+      <p class="uitleg">Iemand typt "Smik", terwijl de officiële topscorerslijst "Brian Brobbey" zegt? Koppel de getypte naam hier aan de echte naam — dan telt de score vanzelf mee, zonder dat je goals hoeft bij te houden. Namen die al goed gespeld zijn hoef je niet te koppelen.</p>
+      <div class="rondekop">
+        <input type="text" id="aliasGetypt" placeholder="Getypte naam (bijv. Smik)" style="min-width:180px">
+        <input type="text" id="aliasEcht" placeholder="Officiële naam (bijv. Brian Brobbey)" style="min-width:220px">
+        <button class="actie mini" id="btnAliasToevoegen">+ Koppelen</button>
+      </div>
+      <div id="aliasLijst"></div>
+      <div class="status" id="aliasStatus"></div>
     </div>
   </section>
 
@@ -1764,8 +1778,6 @@ const ORAKEL_API = '/.netlify/functions/orakel';
 const STAND_API = '/.netlify/functions/stand';
 let orakelInfo = null;
 let orakelTeams = [];
-let orakelSpelers = {}; // { "Ajax": [...], "PSV": [...] }
-let orakelTopscorers = [{club:'',speler:''}, {club:'',speler:''}, {club:'',speler:''}];
 
 async function laadOrakelTeams(){
   try{
@@ -1777,58 +1789,11 @@ async function laadOrakelTeams(){
   }catch(e){}
 }
 
-async function laadOrakelSpelers(club){
-  if(orakelSpelers[club]) return;
-  try{
-    const r = await fetch(STAND_API+'?actie=squad&team='+encodeURIComponent(club), {cache:'no-store'});
-    const j = await r.json().catch(()=>({}));
-    console.log('Squad response voor', club, ':', r.status, j);
-    if(r.ok && Array.isArray(j.spelers) && j.spelers.length){
-      orakelSpelers[club] = j.spelers.map(s=>s.naam).sort();
-    } else {
-      toonStatus('orakelStatus','fout','Spelers van '+esc(club)+' laden mislukt: '+(j.fout || 'leeg antwoord ('+r.status+')'));
-    }
-  }catch(e){
-    console.error('Squad fout:', e);
-    toonStatus('orakelStatus','fout','Spelers laden mislukt: '+e.message);
-  }
-}
-
-function renderTopscorersUI(){
-  const houder = $('topscorersContainer');
-  houder.innerHTML = orakelTopscorers.map((ts, i)=>`
-    <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-weight:600;margin-bottom:8px">${i+1}. Topscorer</div>
-      <div class="rondekop">
-        <div style="flex:1">
-          <select class="topscorer-club" data-index="${i}">
-            <option value="">— Club —</option>
-            ${orakelTeams.map(t=>`<option value="${t}" ${ts.club===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div style="flex:1">
-          <select class="topscorer-speler" data-index="${i}" ${!ts.club?'disabled':''}>
-            <option value="">— Speler —</option>
-            ${(ts.club && orakelSpelers[ts.club])?orakelSpelers[ts.club].map(s=>`<option value="${s}" ${ts.speler===s?'selected':''}>${s}</option>`).join(''):''}
-          </select>
-        </div>
-      </div>
-    </div>
-  `).join('');
-  
-  houder.querySelectorAll('.topscorer-club').forEach(sel=>sel.addEventListener('change', async ()=>{
-    const i = parseInt(sel.dataset.index);
-    const club = sel.value;
-    orakelTopscorers[i].club = club;
-    orakelTopscorers[i].speler = '';
-    if(club) await laadOrakelSpelers(club);
-    renderTopscorersUI();
-  }));
-  
-  houder.querySelectorAll('.topscorer-speler').forEach(sel=>sel.addEventListener('change', ()=>{
-    const i = parseInt(sel.dataset.index);
-    orakelTopscorers[i].speler = sel.value;
-  }));
+/* Koppelingen: getypte naam -> officiële naam uit de football-data topscorerslijst.
+   data.aliassen = { "smik": "Brian Brobbey", ... }  (sleutel genormaliseerd) */
+function aliasVoor(getypt){
+  const al = (data && data.aliassen) || {};
+  return al[normO(getypt)] || getypt;
 }
 
 async function laadOrakel(){
@@ -1879,7 +1844,7 @@ function orakelScore(v){
   const top3 = (liveStand.scorers||[]).slice(0,3).map(s=>normO(s.naam));
   let topPt = 0;
   (v.topscorers||[]).forEach((naam,i)=>{
-    const n = normO(naam);
+    const n = normO(aliasVoor(naam));
     if(!n) return;
     const inTop3 = top3.some(t=>t.includes(n)||n.includes(t));
     if(inTop3) topPt += 5;
@@ -1893,10 +1858,6 @@ function renderOrakel(){
   const info = orakelInfo;
   const deadlineInfo = $('orakelDeadlineInfo');
   const open = info && info.deadlineEpoch && Date.now() < info.deadlineEpoch;
-
-  // Zorg dat teams geladen zijn
-  if(orakelTeams.length === 0) laadOrakelTeams();
-  renderTopscorersUI();
 
   // deadline-balk
   if(!info){ deadlineInfo.textContent = 'Het Orakel kan de server niet bereiken.'; }
@@ -1990,8 +1951,8 @@ $('btnOrakelIndienen').addEventListener('click', async ()=>{
   const team = data.teams && data.teams[naam];
   const wachtwoord = team && team.wachtwoord ? $('orakelWachtwoord').value : '';
   if(team && team.wachtwoord && !wachtwoord){ toonStatus('orakelStatus','fout','Vul je wachtwoord in.'); return; }
-  const topscorers = orakelTopscorers.map(ts=>ts.speler).filter(Boolean);
-  if(topscorers.length < 3){ toonStatus('orakelStatus','fout','Selecteer alle drie de topscorers.'); return; }
+  const topscorers = [$('orakelTs1').value.trim(), $('orakelTs2').value.trim(), $('orakelTs3').value.trim()];
+  if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Vul alle drie de topscorers in.'); return; }
   toonStatus('orakelStatus','info','<span class="laden"></span>Voorspelling wordt ingediend…');
   try{
     const r = await fetch(ORAKEL_API, {
@@ -2052,11 +2013,54 @@ function renderOrakelStand(){
   </div>`;
 }
 
+/* ---------- orakel: topscorers koppelen ---------- */
+function renderAliassen(){
+  const houder = $('aliasLijst');
+  if(!houder) return;
+  const al = data.aliassen || {};
+  const sleutels = Object.keys(al);
+  if(!sleutels.length){ houder.innerHTML = '<div class="leeg">Nog geen koppelingen.</div>'; return; }
+  // getypte namen zoals ze in de voorspellingen staan, voor nette weergave
+  const vs = (orakelInfo && orakelInfo.voorspellingen) || {};
+  const getypteNamen = {};
+  Object.values(vs).forEach(v=>(v.topscorers||[]).forEach(t=>{ getypteNamen[normO(t)] = t; }));
+  houder.innerHTML = `<table class="stand" style="margin-top:12px">
+    <tr><th>Getypt</th><th>Telt als</th><th></th></tr>
+    ${sleutels.map(s=>`<tr>
+      <td>${esc(getypteNamen[s] || s)}</td>
+      <td style="color:var(--chalk-dim)">${esc(al[s])}</td>
+      <td style="text-align:right"><button class="actie gevaar mini alias-weg" data-sleutel="${esc(s)}">Verwijderen</button></td>
+    </tr>`).join('')}
+  </table>`;
+  houder.querySelectorAll('.alias-weg').forEach(b=>b.addEventListener('click', async ()=>{
+    delete data.aliassen[b.dataset.sleutel];
+    await bewaarData('aliasStatus');
+    renderAliassen();
+    renderOrakelStand();
+    toonStatus('aliasStatus','info','Koppeling verwijderd ✓');
+  }));
+}
+
+$('btnAliasToevoegen').addEventListener('click', async ()=>{
+  const getypt = $('aliasGetypt').value.trim();
+  const echt = $('aliasEcht').value.trim();
+  if(!getypt || !echt){ toonStatus('aliasStatus','fout','Vul beide namen in.'); return; }
+  if(!data.aliassen) data.aliassen = {};
+  data.aliassen[normO(getypt)] = echt;
+  await bewaarData('aliasStatus');
+  $('aliasGetypt').value = '';
+  $('aliasEcht').value = '';
+  renderAliassen();
+  renderOrakelStand();
+  toonStatus('aliasStatus','info','Gekoppeld ✓ — de score telt nu mee.');
+});
+
 /* ---------- orakel: admin ---------- */
 function renderOrakelAdmin(){
   const kaart = $('orakelAdminCard');
   kaart.style.display = isAdmin ? 'block' : 'none';
   if(!isAdmin) return;
+  renderAliassen();
   if(data.orakel && data.orakel.deadline) $('orakelDeadlineInput').value = data.orakel.deadline;
   $('btnOrakelPubliceer').textContent = (data.orakel && data.orakel.gepubliceerd)
     ? '🔓 Gepubliceerd — klik om te verbergen' : '🔒 Nog verborgen — klik om te publiceren';
