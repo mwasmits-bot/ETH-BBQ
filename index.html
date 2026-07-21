@@ -476,6 +476,7 @@
         <div style="min-width:220px"><label for="dpAdminKies">Stem invullen namens</label><br><select id="dpAdminKies"></select></div>
       </div>
       <div id="dpStemRijen"></div>
+      <div class="status" id="dpStemStatus"></div>
       <div class="knoppenrij"><button class="actie stil mini" id="dpUitloggen">Uitloggen</button></div>
       <p class="uitleg" style="margin-top:12px">Je keuze wordt meteen opgeslagen en is direct zichtbaar voor iedereen.</p>
     </div>
@@ -2394,6 +2395,7 @@ const BBQ_DATA = [
 ];
 let dpStemmen = {};   // {naam:{id:'ja'|'nee'|'misschien'}}
 let dpSessie = null;  // naam van ingelogde deelnemer (niet-admin)
+let dpSessieWw = '';  // wachtwoord van die deelnemer (voor serverside controle)
 
 async function laadDatumprikker(){
   try{
@@ -2402,11 +2404,12 @@ async function laadDatumprikker(){
   }catch(e){ /* server nog niet actief — UI werkt alsnog */ }
 }
 async function bewaarDpStem(naam){
-  const r = await fetch(DP_API, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ deelnemer:naam, stemmen: dpStemmen[naam] || {} })
-  });
-  if(!r.ok) throw new Error('status '+r.status);
+  const headers = {'Content-Type':'application/json'};
+  const body = { deelnemer:naam, stemmen: dpStemmen[naam] || {} };
+  if(isAdmin && adminWachtwoord) headers['x-wachtwoord'] = adminWachtwoord; // admin mag namens iedereen
+  else body.wachtwoord = dpSessieWw || '';                                  // deelnemer stuurt eigen wachtwoord
+  const r = await fetch(DP_API, { method:'POST', headers, body: JSON.stringify(body) });
+  if(!r.ok){ const j = await r.json().catch(()=>({})); throw new Error(j.fout || ('status '+r.status)); }
 }
 
 function dpTel(id){
@@ -2517,8 +2520,8 @@ async function dpStem(id, val){
   if(!dpStemmen[naam]) dpStemmen[naam]={};
   if(dpStemmen[naam][id]===val) delete dpStemmen[naam][id]; else dpStemmen[naam][id]=val;
   renderDpStemRijen(); renderDpBest(); renderDpOverzicht();
-  try{ await bewaarDpStem(naam); }
-  catch(e){ toonStatus('dpLoginStatus','fout','Opslaan lukte niet — is de datumprikker-functie al gedeployed op Netlify?'); }
+  try{ await bewaarDpStem(naam); verbergStatus('dpStemStatus'); }
+  catch(e){ toonStatus('dpStemStatus','fout', esc(e.message==='status 404'||/reach|fetch/i.test(e.message) ? 'Opslaan lukte niet — is de datumprikker-functie al gedeployed op Netlify?' : e.message)); }
 }
 
 /* login-listeners */
@@ -2534,11 +2537,13 @@ if($('dpWie')){
     if(!naam){ toonStatus('dpLoginStatus','fout','Kies eerst wie je bent.'); return; }
     const team = data.teams && data.teams[naam];
     if(team && team.wachtwoord && $('dpWw').value !== team.wachtwoord){ toonStatus('dpLoginStatus','fout','Onjuist wachtwoord.'); return; }
-    dpSessie = naam; verbergStatus('dpLoginStatus'); $('dpWw').value='';
+    dpSessie = naam;
+    dpSessieWw = (team && team.wachtwoord) ? $('dpWw').value : '';
+    verbergStatus('dpLoginStatus'); $('dpWw').value='';
     renderDatumprikker();
     $('dpStemCard').scrollIntoView({behavior:'smooth'});
   });
-  $('dpUitloggen').addEventListener('click', ()=>{ dpSessie=null; renderDatumprikker(); });
+  $('dpUitloggen').addEventListener('click', ()=>{ dpSessie=null; dpSessieWw=''; verbergStatus('dpStemStatus'); renderDatumprikker(); });
   $('dpVervers').addEventListener('click', async ()=>{ await laadDatumprikker(); renderDatumprikker(); });
   const dpTab = document.querySelector('.tab[data-doel="p-datumprikker"]');
   if(dpTab) dpTab.addEventListener('click', async ()=>{ await laadDatumprikker(); renderDatumprikker(); });
