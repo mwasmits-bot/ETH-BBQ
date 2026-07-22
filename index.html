@@ -678,7 +678,8 @@
       </div>
 
       <div class="knoppenrij" style="margin-top:14px">
-        <button class="actie" id="btnMailOpen">✉️ Open in mailprogramma</button>
+        <button class="actie" id="btnMailVerstuur">🚀 Direct versturen vanuit de app</button>
+        <button class="actie stil" id="btnMailOpen">✉️ Open in mailprogramma</button>
         <button class="actie stil mini" id="btnMailKopieerAdres">📋 Adressen kopiëren</button>
         <button class="actie stil mini" id="btnMailKopieerTekst">📋 Bericht kopiëren</button>
         <button class="actie stil mini" id="btnMailHerbouw">↻ Bericht opnieuw opbouwen</button>
@@ -1238,6 +1239,42 @@ async function kopieerNaarKlembord(tekst, melding){
 }
 if($('mailKeuze')) $('mailKeuze').addEventListener('change', bouwMailBericht);
 if($('btnMailHerbouw')) $('btnMailHerbouw').addEventListener('click', ()=>{ bouwMailBericht(); toonStatus('mailStatus','info','Bericht opnieuw opgebouwd met de laatste cijfers ✓'); });
+const API_MAIL = '/.netlify/functions/mail';
+if($('btnMailVerstuur')) $('btnMailVerstuur').addEventListener('click', async ()=>{
+  if(!isAdmin || !adminWachtwoord){ toonStatus('mailStatus','fout','Log eerst in als admin om te kunnen versturen.'); return; }
+  const gekozen = geselecteerdeOntvangers();
+  if(!gekozen.length){ toonStatus('mailStatus','fout','Je hebt niemand aangevinkt.'); return; }
+  const onderwerp = $('mailOnderwerp').value.trim();
+  const tekst = $('mailTekst').value.trim();
+  if(!onderwerp || !tekst){ toonStatus('mailStatus','fout','Vul een onderwerp en een bericht in.'); return; }
+  const namen = gekozen.map(g=>g.naam).join(', ');
+  if(!confirm(`Nu écht versturen naar ${gekozen.length} ontvanger(s)?\n\n${namen}\n\nOnderwerp: ${onderwerp}`)) return;
+
+  const knop = $('btnMailVerstuur');
+  knop.disabled = true; knop.textContent = '⏳ Bezig met versturen…';
+  toonStatus('mailStatus','info','Bezig met versturen…');
+  try{
+    const persoonlijk = gekozen.length===1 && $('mailAanhef') && $('mailAanhef').checked;
+    const body = persoonlijk ? persoonlijkeAanhef(tekst, gekozen[0].naam) : tekst;
+    const r = await fetch(API_MAIL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-wachtwoord':adminWachtwoord},
+      body: JSON.stringify({
+        ontvangers: gekozen.map(g=>g.email),
+        onderwerp,
+        tekst: body,
+        modus: gekozen.length===1 ? 'to' : $('mailModus').value
+      })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
+    toonStatus('mailStatus','info', `✅ Verstuurd naar ${j.aantal || gekozen.length} ontvanger(s) vanaf ${esc(j.afzender||'je Gmail')}. Kijk in je Verzonden-map.`);
+  }catch(e){
+    toonStatus('mailStatus','fout','Versturen mislukt: ' + esc(e.message) + '. Werkt de mailfunctie nog niet? Gebruik dan "Open in mailprogramma".');
+  }finally{
+    knop.disabled = false; knop.textContent = '🚀 Direct versturen vanuit de app';
+  }
+});
 if($('btnMailOpen')) $('btnMailOpen').addEventListener('click', ()=>{
   const {metEmail} = mailAdressen();
   if(!metEmail.length){ toonStatus('mailStatus','fout','Nog geen enkel e-mailadres ingevuld — voeg ze toe bij Instellingen → Deelnemers beheren.'); return; }
