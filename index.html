@@ -107,9 +107,15 @@
     border:1.5px solid var(--line);border-radius:10px;padding:9px 14px}
   .telt-toggle input{width:17px;height:17px;accent-color:var(--amber);cursor:pointer}
   .telt-toggle span{font-size:14px}
-  input[type=number],input[type=text],input[type=password],input[type=email],select{
+  input[type=number],input[type=text],input[type=password],input[type=email],select,textarea{
     background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);
     font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px;width:100%}
+  textarea:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
+  .mail-ontvangers{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+  .mail-chip{font-size:13px;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line);
+    color:var(--chalk-dim);background:var(--pitch-deep)}
+  .mail-chip.ok{border-color:rgba(255,179,0,.4);color:var(--amber);background:var(--amber-soft)}
+  .mail-chip.mist{border-color:rgba(224,85,72,.4);color:var(--red);background:var(--red-soft)}
   input[type=number]{width:90px;font-family:'Barlow Condensed';font-weight:700;font-size:18px;text-align:center}
   select{cursor:pointer;appearance:auto}
   input:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
@@ -257,6 +263,7 @@
     <button class="tab verborgen adm" data-doel="p-upload">Ronde toevoegen</button>
     <button class="tab verborgen adm" data-doel="p-teams">Selecties</button>
     <button class="tab verborgen adm" data-doel="p-tips">Mail-tips</button>
+    <button class="tab verborgen adm" data-doel="p-mail">✉️ Mailen</button>
     <button class="tab verborgen adm" data-doel="p-instellingen">Instellingen</button>
   </nav>
 
@@ -617,13 +624,65 @@
     </div>
   </section>
 
+  <!-- ============ MAILEN (admin) ============ -->
+  <section class="paneel" id="p-mail">
+    <div class="card">
+      <h2>✉️ Mailen naar de poule</h2>
+      <p class="uitleg">Stel hieronder een bericht samen en open het met één klik in je eigen mailprogramma (Gmail, Outlook, Apple Mail…), met alle deelnemers al ingevuld. Er wordt <strong>niets automatisch verstuurd</strong> — jij drukt zelf op verzenden. De adressen komen uit <strong>Instellingen → Deelnemers beheren</strong>.</p>
+
+      <div id="mailOntvangers" class="mail-ontvangers"></div>
+
+      <div class="rondekop" style="margin-top:6px">
+        <div style="min-width:200px">
+          <label for="mailKeuze">Kies een bericht</label><br>
+          <select id="mailKeuze">
+            <option value="tussenstand">📊 Tussenstand</option>
+            <option value="ronde">⚡ Laatste ronde</option>
+            <option value="orakel">🔮 Orakel-herinnering</option>
+            <option value="vrij">✍️ Vrij bericht</option>
+          </select>
+        </div>
+        <div style="min-width:180px">
+          <label for="mailModus">Adressering</label><br>
+          <select id="mailModus">
+            <option value="bcc">Bcc — privacy (aanrader)</option>
+            <option value="to">Aan — iedereen ziet elkaar</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <label for="mailOnderwerp">Onderwerp</label><br>
+        <input type="text" id="mailOnderwerp" placeholder="Onderwerp van de mail">
+      </div>
+      <div style="margin-top:12px">
+        <label for="mailTekst">Bericht</label><br>
+        <textarea id="mailTekst" rows="13" placeholder="Je bericht…" style="resize:vertical"></textarea>
+      </div>
+
+      <div class="knoppenrij" style="margin-top:14px">
+        <button class="actie" id="btnMailOpen">✉️ Open in mailprogramma</button>
+        <button class="actie stil mini" id="btnMailKopieerAdres">📋 Adressen kopiëren</button>
+        <button class="actie stil mini" id="btnMailKopieerTekst">📋 Bericht kopiëren</button>
+        <button class="actie stil mini" id="btnMailHerbouw">↻ Bericht opnieuw opbouwen</button>
+      </div>
+      <div class="status" id="mailStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>💡 Later: automatisch versturen</h2>
+      <p class="uitleg">Deze mailfunctie werkt meteen, zonder extra instellingen of kosten. Wil je later e-mails <strong>volautomatisch vanuit de server</strong> laten versturen (bijvoorbeeld elke maandag de tussenstand, zonder dat je zelf iets hoeft te doen)? Dan koppelen we een mailservice zoals Resend of SendGrid via een Netlify-functie. De adressen die je nu opslaat, zijn daar al klaar voor.</p>
+    </div>
+  </section>
+
   <!-- ============ INSTELLINGEN (admin) ============ -->
   <section class="paneel" id="p-instellingen">
     <div class="card">
       <h2>Deelnemers beheren</h2>
-      <p class="uitleg">Voeg deelnemers handmatig toe. Als je een wachtwoord instelt, moet dié persoon dat invullen als ze in het Orakel hun voorspelling doen — zo voorkom je dat iemand anders voor de grap als hen inlogt.</p>
+      <p class="uitleg">Voeg deelnemers handmatig toe. Vul meteen een <strong>e-mailadres</strong> in (of laat leeg en vul het later via Bewerken) — die adressen worden onthouden en gebruik je op het tabblad <strong>✉️ Mailen</strong>. Als je een wachtwoord instelt, moet dié persoon dat invullen als ze in het Orakel hun voorspelling doen — zo voorkom je dat iemand anders voor de grap als hen inlogt.</p>
       <div class="rondekop">
-        <input type="text" id="nieuwDeelnemer" placeholder="Naam" style="min-width:160px">
+        <input type="text" id="nieuwDeelnemer" placeholder="Naam" style="min-width:150px">
+        <input type="email" id="nieuwEmail" placeholder="E-mailadres (optioneel)" style="min-width:200px;flex:1">
         <div style="position:relative;min-width:180px">
           <input type="password" id="nieuwWachtwoord" placeholder="Wachtwoord (optioneel)" style="min-width:180px;padding-right:36px">
           <button type="button" id="toggleWachtwoord" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--chalk-dim);cursor:pointer;font-size:16px">👁</button>
@@ -845,7 +904,7 @@ function optimaleOpstelling(spelers, superweekend){
 /* =============== renderen =============== */
 function renderAlles(){
   renderPrijzenkast(); renderStanden(); renderChart(); renderMatrix();
-  renderTeamsUI(); renderTips(); renderHof(); renderRondeBeheer(); renderDeelnemers(); renderAdminUI();
+  renderTeamsUI(); renderTips(); renderHof(); renderRondeBeheer(); renderDeelnemers(); renderMail(); renderAdminUI();
 }
 
 /* ---------- rondebeheer ---------- */
@@ -923,6 +982,7 @@ function renderDeelnemers(){
     const naam = b.dataset.naam;
     const team = data.teams[naam];
     $('nieuwDeelnemer').value = naam;
+    $('nieuwEmail').value = team.email || '';
     $('nieuwWachtwoord').value = team.wachtwoord || '';
     $('nieuwWachtwoord').type = 'text'; // toon het wachtwoord bij bewerken
     $('toggleWachtwoord').textContent = '👁‍🗨';
@@ -943,14 +1003,21 @@ function renderDeelnemers(){
 }
 $('btnDeelnToevoegen').addEventListener('click', async ()=>{
   const naam = $('nieuwDeelnemer').value.trim();
+  const email = $('nieuwEmail').value.trim();
   const ww = $('nieuwWachtwoord').value;
   if(!naam){ toonStatus('deelnStatus','fout','Vul de naam in.'); return; }
+  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    toonStatus('deelnStatus','fout','Dat e-mailadres ziet er niet goed uit — controleer het even.'); return;
+  }
   if(!data.teams) data.teams = {};
   const isNieuw = !data.teams[naam];
-  data.teams[naam] = { email:'', squad:[], wachtwoord:ww };
+  // bestaande gegevens (zoals de selectie) behouden en alleen e-mail + wachtwoord bijwerken
+  const bestaand = data.teams[naam] || { email:'', squad:[], wachtwoord:'' };
+  data.teams[naam] = { ...bestaand, email, squad: bestaand.squad || [], wachtwoord: ww };
   await bewaarData('deelnStatus');
   await laadOrakel();
   $('nieuwDeelnemer').value = '';
+  $('nieuwEmail').value = '';
   $('nieuwWachtwoord').value = '';
   $('nieuwWachtwoord').type = 'password'; // verberg wachtwoord weer
   $('toggleWachtwoord').textContent = '👁';
@@ -959,7 +1026,149 @@ $('btnDeelnToevoegen').addEventListener('click', async ()=>{
   renderDeelnemers();
   renderOrakel();
   renderTeamsUI();
+  renderMail();
   toonStatus('deelnStatus','info', isNieuw ? 'Deelnemer toegevoegd ✓' : 'Deelnemer bijgewerkt ✓');
+});
+
+/* ---------- mailen naar de poule ---------- */
+function mailAdressen(){
+  const metEmail = [], zonderEmail = [];
+  Object.keys(data.teams||{}).sort((a,b)=>a.localeCompare(b,'nl')).forEach(naam=>{
+    const e = (data.teams[naam].email||'').trim();
+    if(e) metEmail.push({naam, email:e}); else zonderEmail.push(naam);
+  });
+  return { metEmail, zonderEmail };
+}
+function laatsteRondeMetScores(){
+  const nrs = rondeNummers().filter(nr=>Object.keys(data.rounds[nr].scores||{}).length);
+  return nrs.length ? nrs[nrs.length-1] : null;
+}
+function tplTussenstand(){
+  const {totaal, gespeeld} = tellingen();
+  const namen = scoreDeelnemers();
+  if(!namen.length) return { onderwerp:'📊 Tussenstand ETH Scorito BBQ', tekst:'Er zijn nog geen meetellende rondes ingevoerd — de eerste stand volgt snel!' };
+  const gesorteerd = [...namen].sort((a,b)=>(totaal[b]||0)-(totaal[a]||0) || a.localeCompare(b,'nl'));
+  const rijen = gesorteerd.map((n,i)=>`${i+1}. ${n} — ${totaal[n]||0} ptn (${gespeeld[n]||0} rondes)`);
+  const koploper = gesorteerd[0], hekkensluiter = gesorteerd[gesorteerd.length-1];
+  const tekst =
+`Mannen,
+
+De tussenstand van de ETH Scorito BBQ:
+
+${rijen.join('\n')}
+
+🏆 Koploper: ${koploper} (${totaal[koploper]||0} ptn)
+🍖 Hekkensluiter: ${hekkensluiter} — jij weet wat je te doen staat richting de BBQ…
+
+Bekijk alles live op ${location.origin}
+
+Groet,
+De organisatie`;
+  return { onderwerp:'📊 Tussenstand ETH Scorito BBQ', tekst };
+}
+function tplRonde(){
+  const nr = laatsteRondeMetScores();
+  if(nr===null) return { onderwerp:'⚡ Uitslag laatste ronde', tekst:'Er is nog geen ronde met scores ingevoerd.' };
+  const scores = data.rounds[nr].scores;
+  const {winnaars, verliezers} = extremen(scores);
+  const gesorteerd = Object.keys(scores).sort((a,b)=>scores[b]-scores[a] || a.localeCompare(b,'nl'));
+  const rijen = gesorteerd.map((n,i)=>`${i+1}. ${n} — ${scores[n]} ptn`);
+  const maxP = Math.max(...Object.values(scores)), minP = Math.min(...Object.values(scores));
+  const tekst =
+`Mannen,
+
+De uitslag van ronde ${nr}:
+
+${rijen.join('\n')}
+
+⚡ Weekprijs: ${winnaars.join(' & ')} met ${maxP} ptn — chapeau!
+📋 Rode lantaarn: ${verliezers.join(' & ')} met ${minP} ptn.
+
+Volledige standen: ${location.origin}
+
+Groet,
+De organisatie`;
+  return { onderwerp:`⚡ Ronde ${nr} — de uitslag`, tekst };
+}
+function tplOrakel(){
+  const o = data.orakel || {};
+  let regel;
+  if(o.deadlineEpoch && Date.now() < o.deadlineEpoch){
+    const ms = o.deadlineEpoch - Date.now();
+    const d = Math.floor(ms/86400000), u = Math.floor((ms%86400000)/3600000);
+    const wanneer = new Date(o.deadlineEpoch).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
+    regel = `Je kunt nog ${d>0? d+' dagen en ':''}${u} uur voorspellen — de deadline is ${wanneer}.`;
+  } else if(o.deadlineEpoch){
+    regel = 'De deadline is inmiddels verstreken — hopelijk heb je op tijd ingediend!';
+  } else {
+    regel = 'Zodra de deadline bekend is, hoor je het — maar begin alvast met nadenken.';
+  }
+  const tekst =
+`Mannen,
+
+Vergeet je voorspelling voor het Eredivisie Orakel niet! ${regel}
+
+Vul hem in op ${location.origin} (tabblad 🔮 Het Eredivisie Orakel).
+
+Succes,
+De organisatie`;
+  return { onderwerp:'🔮 Vergeet je Orakel-voorspelling niet!', tekst };
+}
+function bouwMailBericht(){
+  const keuze = $('mailKeuze').value;
+  let res;
+  if(keuze==='tussenstand') res = tplTussenstand();
+  else if(keuze==='ronde') res = tplRonde();
+  else if(keuze==='orakel') res = tplOrakel();
+  else res = { onderwerp:'', tekst:'' };
+  $('mailOnderwerp').value = res.onderwerp;
+  $('mailTekst').value = res.tekst;
+}
+function renderMail(){
+  const houder = $('mailOntvangers');
+  if(!houder) return;
+  const {metEmail, zonderEmail} = mailAdressen();
+  let html = `<span class="mail-chip ok">📧 ${metEmail.length} met e-mail</span>`;
+  if(zonderEmail.length) html += `<span class="mail-chip mist">⚠️ ${zonderEmail.length} zonder: ${zonderEmail.map(esc).join(', ')}</span>`;
+  if(!metEmail.length && !zonderEmail.length) html = `<span class="mail-chip">Nog geen deelnemers.</span>`;
+  houder.innerHTML = html;
+  // eerste keer of leeg → alvast een bericht klaarzetten
+  if($('mailTekst') && $('mailTekst').value.trim()==='') bouwMailBericht();
+}
+async function kopieerNaarKlembord(tekst, melding){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(tekst); }
+    else {
+      const ta = document.createElement('textarea');
+      ta.value = tekst; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    toonStatus('mailStatus','info', melding);
+  }catch(e){ toonStatus('mailStatus','fout','Kopiëren lukte niet — selecteer en kopieer handmatig.'); }
+}
+if($('mailKeuze')) $('mailKeuze').addEventListener('change', bouwMailBericht);
+if($('btnMailHerbouw')) $('btnMailHerbouw').addEventListener('click', ()=>{ bouwMailBericht(); toonStatus('mailStatus','info','Bericht opnieuw opgebouwd met de laatste cijfers ✓'); });
+if($('btnMailOpen')) $('btnMailOpen').addEventListener('click', ()=>{
+  const {metEmail} = mailAdressen();
+  if(!metEmail.length){ toonStatus('mailStatus','fout','Nog geen enkel e-mailadres ingevuld — voeg ze toe bij Instellingen → Deelnemers beheren.'); return; }
+  const adressen = metEmail.map(m=>m.email);
+  const modus = $('mailModus').value;
+  const onderwerp = encodeURIComponent($('mailOnderwerp').value);
+  const tekst = encodeURIComponent($('mailTekst').value);
+  const lijst = adressen.map(encodeURIComponent).join(',');
+  const mailto = modus==='bcc'
+    ? `mailto:?bcc=${lijst}&subject=${onderwerp}&body=${tekst}`
+    : `mailto:${lijst}?subject=${onderwerp}&body=${tekst}`;
+  window.location.href = mailto;
+  toonStatus('mailStatus','info', `Mailprogramma geopend met ${adressen.length} ontvanger(s). Controleer en druk zelf op verzenden. Opent er niets? Gebruik dan de kopieerknoppen.`);
+});
+if($('btnMailKopieerAdres')) $('btnMailKopieerAdres').addEventListener('click', ()=>{
+  const {metEmail} = mailAdressen();
+  if(!metEmail.length){ toonStatus('mailStatus','fout','Nog geen e-mailadressen om te kopiëren.'); return; }
+  kopieerNaarKlembord(metEmail.map(m=>m.email).join(', '), `${metEmail.length} adres(sen) gekopieerd ✓ — plak ze in de bcc van je webmail.`);
+});
+if($('btnMailKopieerTekst')) $('btnMailKopieerTekst').addEventListener('click', ()=>{
+  kopieerNaarKlembord($('mailOnderwerp').value + '\n\n' + $('mailTekst').value, 'Onderwerp + bericht gekopieerd ✓');
 });
 
 /* ---------- prijzenkast ---------- */
@@ -1174,7 +1383,7 @@ function renderAdminUI(){
   b.classList.toggle('ingelogd', isAdmin);
   if(!isAdmin){
     const open = document.querySelector('section.paneel.actief');
-    if(open && ['p-upload','p-teams','p-tips','p-instellingen'].includes(open.id)) gaNaarTab('p-standen');
+    if(open && ['p-upload','p-teams','p-tips','p-mail','p-instellingen'].includes(open.id)) gaNaarTab('p-standen');
   }
 }
 $('btnAdmin').addEventListener('click', ()=>{
@@ -1586,10 +1795,13 @@ $('btnTeamOpslaan').addEventListener('click', async ()=>{
     if(!sp) return;
     squad.push({naam:sp, positie:tr.querySelector('select').value});
   });
-  data.teams[naam] = { email: $('teamEmail').value.trim(), squad };
+  const bestaand = data.teams[naam] || {};
+  data.teams[naam] = { ...bestaand, email: $('teamEmail').value.trim(), squad };
   await bewaarData('teamStatus');
   toonStatus('teamStatus','info','Selectie van '+esc(naam)+' opgeslagen ✓ ('+squad.length+' spelers)');
   renderTips();
+  renderDeelnemers();
+  renderMail();
 });
 
 /* =============== hall of fame =============== */
