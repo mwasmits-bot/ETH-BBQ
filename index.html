@@ -112,6 +112,16 @@
     font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px;width:100%}
   textarea:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
   .mail-ontvangers{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+  .mail-balk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 2px}
+  .mail-aanhef{font-size:13px;color:var(--chalk-dim);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+  .mail-aanhef input{width:16px;height:16px;accent-color:var(--amber);cursor:pointer}
+  .mail-lijst{display:grid;gap:6px;margin:8px 0 4px}
+  .mail-rij{display:flex;align-items:center;gap:10px;padding:8px 11px;background:var(--pitch-deep);border:1px solid var(--line);border-radius:9px}
+  .mail-rij.geenmail{opacity:.5}
+  .mail-rij input[type=checkbox]{width:17px;height:17px;accent-color:var(--amber);cursor:pointer;flex:0 0 auto}
+  .mail-rij .mr-naam{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.02em;min-width:110px}
+  .mail-rij .mr-adres{flex:1;min-width:0;font-size:13px;color:var(--chalk-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mail-rij .mr-knop{flex:0 0 auto}
   .mail-chip{font-size:13px;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line);
     color:var(--chalk-dim);background:var(--pitch-deep)}
   .mail-chip.ok{border-color:rgba(255,179,0,.4);color:var(--amber);background:var(--amber-soft)}
@@ -632,6 +642,13 @@
 
       <div id="mailOntvangers" class="mail-ontvangers"></div>
 
+      <div class="mail-balk">
+        <button class="actie stil mini" id="btnMailAlles">Alles aanvinken</button>
+        <button class="actie stil mini" id="btnMailNiets">Niets aanvinken</button>
+        <label class="mail-aanhef" for="mailAanhef"><input type="checkbox" id="mailAanhef" checked> Persoonlijke aanhef bij één ontvanger</label>
+      </div>
+      <div id="mailLijst" class="mail-lijst"></div>
+
       <div class="rondekop" style="margin-top:6px">
         <div style="min-width:200px">
           <label for="mailKeuze">Kies een bericht</label><br>
@@ -1124,17 +1141,90 @@ function bouwMailBericht(){
   $('mailOnderwerp').value = res.onderwerp;
   $('mailTekst').value = res.tekst;
 }
+let mailUitgevinkt = new Set();   // namen die de admin heeft uitgevinkt
+
+function geselecteerdeOntvangers(){
+  return mailAdressen().metEmail.filter(m=>!mailUitgevinkt.has(m.naam));
+}
+function persoonlijkeAanhef(tekst, naam){
+  const regels = String(tekst).split('\n');
+  if(regels.length && /^(mannen|hoi|hallo|beste|dag|heren)\b/i.test(regels[0].trim())){
+    regels[0] = 'Hoi ' + naam + ',';
+  } else {
+    regels.unshift('Hoi ' + naam + ',', '');
+  }
+  return regels.join('\n');
+}
+function openMailto(ontvangers){
+  if(!ontvangers.length){ toonStatus('mailStatus','fout','Geen ontvangers geselecteerd.'); return; }
+  let body = $('mailTekst').value;
+  if(ontvangers.length===1 && $('mailAanhef') && $('mailAanhef').checked){
+    body = persoonlijkeAanhef(body, ontvangers[0].naam);
+  }
+  const onderwerp = encodeURIComponent($('mailOnderwerp').value);
+  const tekst = encodeURIComponent(body);
+  const lijst = ontvangers.map(o=>encodeURIComponent(o.email)).join(',');
+  const modus = ontvangers.length===1 ? 'to' : $('mailModus').value;   // één persoon → gewoon 'aan'
+  const mailto = modus==='bcc'
+    ? `mailto:?bcc=${lijst}&subject=${onderwerp}&body=${tekst}`
+    : `mailto:${lijst}?subject=${onderwerp}&body=${tekst}`;
+  window.location.href = mailto;
+  toonStatus('mailStatus','info', ontvangers.length===1
+    ? `Mailprogramma geopend voor ${esc(ontvangers[0].naam)}. Controleer en druk zelf op verzenden.`
+    : `Mailprogramma geopend met ${ontvangers.length} ontvanger(s). Controleer en druk zelf op verzenden. Opent er niets? Gebruik dan de kopieerknoppen.`);
+}
+
 function renderMail(){
   const houder = $('mailOntvangers');
   if(!houder) return;
   const {metEmail, zonderEmail} = mailAdressen();
-  let html = `<span class="mail-chip ok">📧 ${metEmail.length} met e-mail</span>`;
-  if(zonderEmail.length) html += `<span class="mail-chip mist">⚠️ ${zonderEmail.length} zonder: ${zonderEmail.map(esc).join(', ')}</span>`;
+  const gekozen = geselecteerdeOntvangers();
+
+  let html = `<span class="mail-chip ok">📧 ${gekozen.length} van ${metEmail.length} geselecteerd</span>`;
+  if(zonderEmail.length) html += `<span class="mail-chip mist">⚠️ ${zonderEmail.length} zonder e-mail: ${zonderEmail.map(esc).join(', ')}</span>`;
   if(!metEmail.length && !zonderEmail.length) html = `<span class="mail-chip">Nog geen deelnemers.</span>`;
   houder.innerHTML = html;
+
+  const lijst = $('mailLijst');
+  if(lijst){
+    const alles = [...metEmail.map(m=>({...m, heeft:true})),
+                   ...zonderEmail.map(n=>({naam:n, email:'', heeft:false}))]
+                  .sort((a,b)=>a.naam.localeCompare(b.naam,'nl'));
+    lijst.innerHTML = alles.length ? alles.map(p=>{
+      if(!p.heeft){
+        return `<div class="mail-rij geenmail">
+          <input type="checkbox" disabled>
+          <span class="mr-naam">${esc(p.naam)}</span>
+          <span class="mr-adres">geen e-mailadres — vul in bij Instellingen</span>
+        </div>`;
+      }
+      const aan = !mailUitgevinkt.has(p.naam) ? 'checked' : '';
+      return `<div class="mail-rij">
+        <input type="checkbox" class="mail-vink" data-naam="${esc(p.naam)}" ${aan}>
+        <span class="mr-naam">${esc(p.naam)}</span>
+        <span class="mr-adres">${esc(p.email)}</span>
+        <button class="actie stil mini mr-knop mail-een" data-naam="${esc(p.naam)}" title="Alleen ${esc(p.naam)} mailen">✉️ Alleen deze</button>
+      </div>`;
+    }).join('') : '<div class="leeg">Nog geen deelnemers.</div>';
+
+    lijst.querySelectorAll('.mail-vink').forEach(v=>v.addEventListener('change', ()=>{
+      if(v.checked) mailUitgevinkt.delete(v.dataset.naam); else mailUitgevinkt.add(v.dataset.naam);
+      renderMail();
+    }));
+    lijst.querySelectorAll('.mail-een').forEach(b=>b.addEventListener('click', ()=>{
+      const naam = b.dataset.naam;
+      const p = mailAdressen().metEmail.find(m=>m.naam===naam);
+      if(p) openMailto([p]);
+    }));
+  }
+
   // eerste keer of leeg → alvast een bericht klaarzetten
   if($('mailTekst') && $('mailTekst').value.trim()==='') bouwMailBericht();
 }
+if($('btnMailAlles')) $('btnMailAlles').addEventListener('click', ()=>{ mailUitgevinkt.clear(); renderMail(); });
+if($('btnMailNiets')) $('btnMailNiets').addEventListener('click', ()=>{
+  mailAdressen().metEmail.forEach(m=>mailUitgevinkt.add(m.naam)); renderMail();
+});
 async function kopieerNaarKlembord(tekst, melding){
   try{
     if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(tekst); }
@@ -1151,21 +1241,14 @@ if($('btnMailHerbouw')) $('btnMailHerbouw').addEventListener('click', ()=>{ bouw
 if($('btnMailOpen')) $('btnMailOpen').addEventListener('click', ()=>{
   const {metEmail} = mailAdressen();
   if(!metEmail.length){ toonStatus('mailStatus','fout','Nog geen enkel e-mailadres ingevuld — voeg ze toe bij Instellingen → Deelnemers beheren.'); return; }
-  const adressen = metEmail.map(m=>m.email);
-  const modus = $('mailModus').value;
-  const onderwerp = encodeURIComponent($('mailOnderwerp').value);
-  const tekst = encodeURIComponent($('mailTekst').value);
-  const lijst = adressen.map(encodeURIComponent).join(',');
-  const mailto = modus==='bcc'
-    ? `mailto:?bcc=${lijst}&subject=${onderwerp}&body=${tekst}`
-    : `mailto:${lijst}?subject=${onderwerp}&body=${tekst}`;
-  window.location.href = mailto;
-  toonStatus('mailStatus','info', `Mailprogramma geopend met ${adressen.length} ontvanger(s). Controleer en druk zelf op verzenden. Opent er niets? Gebruik dan de kopieerknoppen.`);
+  const gekozen = geselecteerdeOntvangers();
+  if(!gekozen.length){ toonStatus('mailStatus','fout','Je hebt niemand aangevinkt — vink minstens één deelnemer aan.'); return; }
+  openMailto(gekozen);
 });
 if($('btnMailKopieerAdres')) $('btnMailKopieerAdres').addEventListener('click', ()=>{
-  const {metEmail} = mailAdressen();
-  if(!metEmail.length){ toonStatus('mailStatus','fout','Nog geen e-mailadressen om te kopiëren.'); return; }
-  kopieerNaarKlembord(metEmail.map(m=>m.email).join(', '), `${metEmail.length} adres(sen) gekopieerd ✓ — plak ze in de bcc van je webmail.`);
+  const gekozen = geselecteerdeOntvangers();
+  if(!gekozen.length){ toonStatus('mailStatus','fout','Nog geen e-mailadressen aangevinkt om te kopiëren.'); return; }
+  kopieerNaarKlembord(gekozen.map(m=>m.email).join(', '), `${gekozen.length} adres(sen) gekopieerd ✓ — plak ze in de bcc van je webmail.`);
 });
 if($('btnMailKopieerTekst')) $('btnMailKopieerTekst').addEventListener('click', ()=>{
   kopieerNaarKlembord($('mailOnderwerp').value + '\n\n' + $('mailTekst').value, 'Onderwerp + bericht gekopieerd ✓');
