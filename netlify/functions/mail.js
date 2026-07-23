@@ -1,12 +1,14 @@
-// Mail versturen vanuit de app via je eigen Gmail (SMTP + app-wachtwoord).
+// Mail versturen vanuit de app via Resend (SMTP), met je eigen domein als afzender.
 // Beveiliging:
 // - Alleen met het admin-wachtwoord (zelfde controle als de andere functies).
 // - Er wordt alleen gemaild naar adressen die als deelnemer in de poule staan,
 //   zodat deze functie nooit als open doorgeefluik gebruikt kan worden.
 // Vereiste environment variables in Netlify:
-//   ADMIN_WACHTWOORD        — die heb je al
-//   GMAIL_ADRES             — jouw gmail-adres, bv. jij@gmail.com
-//   GMAIL_APP_WACHTWOORD    — 16-tekens app-wachtwoord van Google (geen gewoon wachtwoord!)
+//   ADMIN_WACHTWOORD   — die heb je al
+//   RESEND_API_KEY     — API-key uit je Resend-account (begint met re_)
+//   AFZENDER_ADRES     — bv. info@ethscoritobbq.com (moet een geverifieerd domein zijn in Resend)
+//   AFZENDER_NAAM      — optioneel, bv. ETH Scorito BBQ
+//   ANTWOORD_ADRES     — jouw eigen gmail; hier komen antwoorden binnen
 import { getStore } from "@netlify/blobs";
 import nodemailer from "nodemailer";
 
@@ -23,13 +25,18 @@ export default async (req) => {
   }
 
   // --- instellingen controleren ---
-  const afzender = process.env.GMAIL_ADRES;
-  const appWachtwoord = process.env.GMAIL_APP_WACHTWOORD;
-  if (!afzender || !appWachtwoord) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const afzenderAdres = process.env.AFZENDER_ADRES;
+  const afzenderNaam = process.env.AFZENDER_NAAM || "ETH Scorito BBQ";
+  const antwoordAdres = process.env.ANTWOORD_ADRES || afzenderAdres;
+
+  if (!apiKey || !afzenderAdres) {
     return Response.json({
-      fout: "Gmail is nog niet ingesteld. Zet GMAIL_ADRES en GMAIL_APP_WACHTWOORD in Netlify → Site configuration → Environment variables."
+      fout: "Mail is nog niet ingesteld. Zet RESEND_API_KEY en AFZENDER_ADRES in Netlify → Site configuration → Environment variables."
     }, { status: 500 });
   }
+
+  const afzender = `${afzenderNaam} <${afzenderAdres}>`;
 
   let body;
   try { body = await req.json(); } catch { body = null; }
@@ -59,27 +66,38 @@ export default async (req) => {
   // --- versturen ---
   try {
     const transport = nodemailer.createTransport({
-      host: "smtp.gmail.com",
+      host: "smtp.resend.com",
       port: 465,
       secure: true,
-      auth: { user: afzender, pass: appWachtwoord }
+      auth: { user: "resend", pass: apiKey }
     });
 
     const naarBcc = modus !== "to" && geldig.length > 1;
     await transport.sendMail({
       from: afzender,
-      to: naarBcc ? afzender : geldig.join(", "),   // bij bcc jezelf als zichtbare ontvanger
+      // Bij bcc gaat de zichtbare ontvanger naar jouw eigen adres, zodat je zelf
+      // een kopie krijgt. Let op: dit moet een adres zijn dat post kán ontvangen,
+      // dus je gmail — niet info@ethscoritobbq.com (daar staat geen mailbox achter).
+      to: naarBcc ? antwoordAdres : geldig.join(", "),
       bcc: naarBcc ? geldig.join(", ") : undefined,
+      replyTo: antwoordAdres,
       subject: onderwerp,
       text: tekst
     });
 
-    return Response.json({ ok: true, aantal: geldig.length, afzender });
+    return Response.json({ ok: true, aantal: geldig.length, afzender: afzenderAdres });
   } catch (e) {
     const melding = String(e && e.message || e);
-    const vriendelijk = /invalid login|username and password/i.test(melding)
-      ? "Gmail weigert de login. Controleer of GMAIL_APP_WACHTWOORD een app-wachtwoord is (16 tekens, zonder spaties) en of tweestapsverificatie aanstaat."
-      : melding;
+    let vriendelijk = melding;
+
+    if (/invalid login|username and password|535|authentication/i.test(melding)) {
+      vriendelijk = "Resend weigert de login. Controleer of RESEND_API_KEY klopt (begint met re_) en of de key nog actief is.";
+    } else if (/domain|not verified|403/i.test(melding)) {
+      vriendelijk = `Het domein van ${afzenderAdres} is nog niet geverifieerd in Resend. Controleer of de MX/SPF/DKIM-records in Netlify DNS staan en of Resend het domein als "Verified" toont.`;
+    } else if (/rate|quota|429/i.test(melding)) {
+      vriendelijk = "Daglimiet van Resend bereikt (100 mails/dag op de gratis tier). Probeer het morgen opnieuw.";
+    }
+
     return Response.json({ fout: vriendelijk }, { status: 500 });
   }
 };
