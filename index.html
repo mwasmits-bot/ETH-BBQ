@@ -68,6 +68,7 @@
   .tab.actief{background:var(--amber);border-color:var(--amber);color:#1C1607}
   .tab:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   .tab.verborgen{display:none}
+  .sb-verborgen{display:none}
 
   section.paneel{display:none}
   section.paneel.actief{display:block}
@@ -270,6 +271,7 @@
     <button class="tab" data-doel="p-reglement">📋 Reglement</button>
     <button class="tab" data-doel="p-orakel">🔮 Het Eredivisie Orakel</button>
     <button class="tab" data-doel="p-datumprikker">🔥 BBQ-datumprikker</button>
+    <button class="tab verborgen sb" data-doel="p-sidebets">🎲 Side Bets</button>
     <button class="tab verborgen adm" data-doel="p-upload">Ronde toevoegen</button>
     <button class="tab verborgen adm" data-doel="p-teams">Selecties</button>
     <button class="tab verborgen adm" data-doel="p-tips">Mail-tips</button>
@@ -497,6 +499,61 @@
       <div class="knoppenrij"><button class="actie stil mini" id="dpUitloggen">Uitloggen</button></div>
       <p class="uitleg" style="margin-top:12px">Je keuze wordt meteen opgeslagen en is direct zichtbaar voor iedereen.</p>
     </div>
+  </section>
+
+  <section class="paneel" id="p-sidebets">
+
+    <div class="card" style="border-left:3px solid var(--amber)">
+      <h2>🎲 Side Bets</h2>
+      <p class="uitleg">Daag elkaar uit op de uitslag van een Eredivisiewedstrijd. Je plaatst een uitdaging met je keuze en je inzet; een ander haakt aan met een <strong>andere</strong> uitkomst. Wie gelijk heeft, wint de hele pot. Heeft niemand van de twee gelijk, dan krijgt iedereen zijn inzet terug.</p>
+      <p class="uitleg" style="margin-bottom:0">Inzet in hele euro's, maximaal €100. Inzetten sluit automatisch bij het aanfluiten. De poule houdt niets in — alles gaat één op één tussen de twee spelers.</p>
+    </div>
+
+    <!-- admin-instellingen -->
+    <div class="card sb-verborgen" id="sbAdminCard">
+      <h2>Beheer</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+        <button class="knop" id="sbToggleActief">—</button>
+        <label style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--chalk-dim);font-size:14px">bunq.me-naam</span>
+          <input id="sbBunqNaam" placeholder="bijv. mwasmits" style="width:160px">
+        </label>
+        <button class="knop" id="sbBewaarBunq">Opslaan</button>
+      </div>
+      <p class="uitleg" style="margin-bottom:0">De bunq.me-naam is het stukje achter bunq.me/ in je eigen betaallink. Vul je die in, dan krijgt elke speler een kant-en-klaar betaalverzoek te zien.</p>
+      <div class="status" id="sbAdminStatus"></div>
+    </div>
+
+    <!-- wie ben je -->
+    <div class="card" id="sbSessieCard">
+      <h2>Wie ben je?</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <select id="sbNaam" style="min-width:180px"></select>
+        <input id="sbWw" type="password" placeholder="wachtwoord (indien ingesteld)" style="width:220px">
+        <button class="knop primair" id="sbAanmelden">Aanmelden</button>
+        <button class="knop sb-verborgen" id="sbAfmelden">Afmelden</button>
+      </div>
+      <div class="status" id="sbSessieStatus"></div>
+    </div>
+
+    <!-- wedstrijden -->
+    <div class="card">
+      <h2>Wedstrijden</h2>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+        <button class="knop" id="sbVorige">‹ vorige</button>
+        <strong id="sbRondeLabel" style="color:var(--amber)">—</strong>
+        <button class="knop" id="sbVolgende">volgende ›</button>
+      </div>
+      <div id="sbWedstrijden"><p class="uitleg">Laden…</p></div>
+      <div class="status" id="sbStatus"></div>
+    </div>
+
+    <!-- saldo -->
+    <div class="card">
+      <h2>Tussenstand in euro's</h2>
+      <div id="sbSaldo"></div>
+    </div>
+
   </section>
 
   <!-- ============ RONDE TOEVOEGEN (admin) ============ -->
@@ -2893,6 +2950,348 @@ if($('dpWie')){
   renderOrakel();
   await laadDatumprikker();
   renderDatumprikker();
+})();
+
+/* =============== side bets =============== */
+const SB_API = '/.netlify/functions/sidebets';
+const SB_WED_API = '/.netlify/functions/wedstrijden';
+
+let sbData = { actief:false, bunqNaam:'', weddenschappen:[] };
+let sbWed = { speelronde:null, huidigeRonde:null, wedstrijden:[] };
+let sbRonde = null;
+let sbSessie = null;      // naam van de aangemelde deelnemer
+let sbSessieWw = '';
+
+async function laadSidebets(){
+  try{
+    const r = await fetch(SB_API, { cache:'no-store' });
+    if(r.ok) sbData = await r.json();
+  }catch(e){ /* nog geen data */ }
+  sbToonTab();
+}
+
+async function laadSbWedstrijden(ronde){
+  try{
+    const q = ronde ? ('?ronde='+ronde) : '';
+    const r = await fetch(SB_WED_API+q, { cache:'no-store' });
+    if(r.ok){
+      sbWed = await r.json();
+      sbRonde = sbWed.speelronde;
+    }
+  }catch(e){ /* stil */ }
+}
+
+function sbToonTab(){
+  const knop = document.querySelector('.tab[data-doel="p-sidebets"]');
+  if(!knop) return;
+  knop.classList.toggle('verborgen', !(isAdmin || sbData.actief));
+  const adm = $('sbAdminCard');
+  if(adm) adm.classList.toggle('sb-verborgen', !isAdmin);
+}
+
+async function sbPost(payload){
+  const headers = {'Content-Type':'application/json'};
+  if(isAdmin && adminWachtwoord) headers['x-wachtwoord'] = adminWachtwoord;
+  const r = await fetch(SB_API, { method:'POST', headers, body: JSON.stringify(payload) });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
+  if(j.sidebets) sbData = j.sidebets;
+  return j;
+}
+
+function sbBunqLink(bedrag, omschrijving){
+  if(!sbData.bunqNaam) return null;
+  return `https://bunq.me/${encodeURIComponent(sbData.bunqNaam)}/${bedrag}/${encodeURIComponent(omschrijving)}`;
+}
+
+const SB_LABEL = { thuis:'thuis wint', gelijk:'gelijkspel', uit:'uit wint' };
+
+function sbWedstrijdVan(matchId){
+  return sbWed.wedstrijden.find(w => w.id === matchId) || null;
+}
+
+/* Bepaalt de afloop van één weddenschap.
+   -> {status:'open'|'wacht'|'klaar', winnaar:naam|null, terug:bool} */
+function sbAfloop(w){
+  if(!w.tegenstander) return { status:'open', winnaar:null, terug:false };
+  const m = sbWedstrijdVan(w.matchId);
+  const uitkomst = m ? m.uitkomst : null;
+  if(!uitkomst) return { status:'wacht', winnaar:null, terug:false };
+  if(uitkomst === w.keuzeUitdager) return { status:'klaar', winnaar:w.uitdager, terug:false };
+  if(uitkomst === w.keuzeTegenstander) return { status:'klaar', winnaar:w.tegenstander, terug:false };
+  return { status:'klaar', winnaar:null, terug:true };
+}
+
+function sbGesloten(w){
+  return new Date(w.aftrap).getTime() <= Date.now();
+}
+
+function sbTijd(iso){
+  try{
+    return new Date(iso).toLocaleString('nl-NL', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  }catch(e){ return iso; }
+}
+
+function renderSidebets(){
+  if(!$('sbWedstrijden')) return;
+
+  // deelnemerslijst
+  const sel = $('sbNaam');
+  if(sel){
+    const namen = alleDeelnemers();
+    if(namen.length && sel.dataset.aantal !== String(namen.length)){
+      const huidig = sel.value;
+      sel.innerHTML = namen.map(n=>`<option>${esc(n)}</option>`).join('');
+      if(namen.includes(huidig)) sel.value = huidig;
+      sel.dataset.aantal = String(namen.length);
+    }
+  }
+
+  // admin-knoppen
+  if($('sbToggleActief')){
+    $('sbToggleActief').textContent = sbData.actief
+      ? '🔓 Open voor deelnemers — klik om te sluiten'
+      : '🔒 Alleen zichtbaar voor jou — klik om open te zetten';
+  }
+  if($('sbBunqNaam') && document.activeElement !== $('sbBunqNaam')){
+    $('sbBunqNaam').value = sbData.bunqNaam || '';
+  }
+
+  $('sbRondeLabel').textContent = sbRonde ? ('Speelronde '+sbRonde) : '—';
+
+  // wedstrijden met hun weddenschappen
+  const rows = sbWed.wedstrijden.map(m => {
+    const bets = sbData.weddenschappen.filter(w => w.matchId === m.id);
+    const open = bets.filter(w => !w.tegenstander);
+    const gematcht = bets.filter(w => w.tegenstander);
+    const dicht = new Date(m.aftrap).getTime() <= Date.now();
+
+    let uitslag = '';
+    if(m.status === 'FINISHED'){
+      uitslag = `<strong style="color:var(--amber)">${m.thuisDoelpunten}–${m.uitDoelpunten}</strong>`;
+    } else if(m.status === 'IN_PLAY' || m.status === 'PAUSED'){
+      uitslag = `<span style="color:var(--amber)">bezig…</span>`;
+    } else {
+      uitslag = `<span style="color:var(--chalk-dim)">${esc(sbTijd(m.aftrap))}</span>`;
+    }
+
+    // openstaande uitdagingen
+    const openHtml = open.map(w => {
+      const magAanhaken = sbSessie && sbSessie !== w.uitdager && !dicht;
+      const andere = ['thuis','gelijk','uit'].filter(k => k !== w.keuzeUitdager);
+      const knoppen = magAanhaken
+        ? andere.map(k=>`<button class="knop" data-haak="${w.id}" data-keuze="${k}">Aanhaken met ${SB_LABEL[k]}</button>`).join(' ')
+        : '';
+      const intrek = (sbSessie === w.uitdager && !dicht)
+        ? `<button class="knop" data-intrek="${w.id}">Intrekken</button>` : '';
+      return `<div style="padding:8px 0;border-top:1px solid var(--line)">
+        <strong>${esc(w.uitdager)}</strong> zet <strong>€${w.inzet}</strong> op <strong>${SB_LABEL[w.keuzeUitdager]}</strong>
+        <span style="color:var(--chalk-dim)"> — wacht op tegenstander</span>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${knoppen}${intrek}</div>
+      </div>`;
+    }).join('');
+
+    // lopende / afgeronde weddenschappen
+    const matchHtml = gematcht.map(w => {
+      const a = sbAfloop(w);
+      let uitkomstTekst = '<span style="color:var(--chalk-dim)">nog niet gespeeld</span>';
+      if(a.status === 'klaar' && a.terug) uitkomstTekst = '<span style="color:var(--chalk-dim)">niemand goed — inzet terug</span>';
+      else if(a.status === 'klaar') uitkomstTekst = `<strong style="color:var(--amber)">${esc(a.winnaar)} wint €${w.inzet * 2}</strong>`;
+      const betaal = [];
+      if(!w.betaaldUitdager) betaal.push(esc(w.uitdager));
+      if(!w.betaaldTegenstander) betaal.push(esc(w.tegenstander));
+      const betaalTekst = betaal.length
+        ? `<span style="color:var(--chalk-dim)"> · nog niet betaald: ${betaal.join(', ')}</span>` : '';
+      const adminKnoppen = isAdmin
+        ? `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+             <button class="knop" data-betaald="${w.id}" data-wie="uitdager" data-waarde="${w.betaaldUitdager?0:1}">${w.betaaldUitdager?'✓':'○'} ${esc(w.uitdager)} betaald</button>
+             <button class="knop" data-betaald="${w.id}" data-wie="tegenstander" data-waarde="${w.betaaldTegenstander?0:1}">${w.betaaldTegenstander?'✓':'○'} ${esc(w.tegenstander)} betaald</button>
+             ${a.status==='klaar' ? `<button class="knop" data-afgerekend="${w.id}" data-waarde="${w.afgerekend?0:1}">${w.afgerekend?'✓ uitbetaald':'○ nog uitbetalen'}</button>` : ''}
+           </div>` : '';
+      return `<div style="padding:8px 0;border-top:1px solid var(--line)">
+        <strong>${esc(w.uitdager)}</strong> (${SB_LABEL[w.keuzeUitdager]}) vs <strong>${esc(w.tegenstander)}</strong> (${SB_LABEL[w.keuzeTegenstander]}) — €${w.inzet} p.p.
+        <div style="margin-top:4px">${uitkomstTekst}${betaalTekst}</div>
+        ${adminKnoppen}
+      </div>`;
+    }).join('');
+
+    // nieuwe uitdaging plaatsen
+    const plaatsHtml = (sbSessie && !dicht)
+      ? `<div style="padding:10px 0 2px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+           <select data-keuzevoor="${m.id}">
+             <option value="thuis">${esc(m.thuis)} wint</option>
+             <option value="gelijk">gelijkspel</option>
+             <option value="uit">${esc(m.uit)} wint</option>
+           </select>
+           <input type="number" min="1" max="100" step="1" value="5" data-inzetvoor="${m.id}" style="width:90px" placeholder="€">
+           <button class="knop primair" data-plaats="${m.id}">Uitdaging plaatsen</button>
+         </div>`
+      : (dicht ? '' : `<p class="uitleg" style="margin:8px 0 0">Meld je hierboven aan om een uitdaging te plaatsen.</p>`);
+
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <strong>${esc(m.thuis)} — ${esc(m.uit)}</strong>
+        <span>${uitslag}</span>
+      </div>
+      ${openHtml}${matchHtml}${plaatsHtml}
+    </div>`;
+  }).join('');
+
+  $('sbWedstrijden').innerHTML = rows || '<p class="uitleg">Geen wedstrijden gevonden voor deze speelronde.</p>';
+
+  renderSbSaldo();
+}
+
+function renderSbSaldo(){
+  const saldo = {};
+  const raak = (n,v)=>{ saldo[n] = (saldo[n]||0) + v; };
+
+  sbData.weddenschappen.forEach(w=>{
+    if(!w.tegenstander) return;
+    const a = sbAfloop(w);
+    if(a.status !== 'klaar' || a.terug) return;
+    const verliezer = a.winnaar === w.uitdager ? w.tegenstander : w.uitdager;
+    raak(a.winnaar, w.inzet);
+    raak(verliezer, -w.inzet);
+  });
+
+  const namen = Object.keys(saldo).sort((a,b)=> saldo[b]-saldo[a]);
+  if(!namen.length){ $('sbSaldo').innerHTML = '<p class="uitleg">Nog geen afgeronde weddenschappen.</p>'; return; }
+
+  $('sbSaldo').innerHTML = `<table><thead><tr><th>Deelnemer</th><th style="text-align:right">Saldo</th></tr></thead><tbody>`
+    + namen.map(n=>{
+        const v = saldo[n];
+        const kleur = v > 0 ? 'var(--amber)' : (v < 0 ? 'rgba(255,120,120,.9)' : 'var(--chalk-dim)');
+        return `<tr><td>${esc(n)}</td><td style="text-align:right;color:${kleur}">${v>0?'+':''}€${v}</td></tr>`;
+      }).join('')
+    + `</tbody></table>`;
+}
+
+/* ---------- acties ---------- */
+document.addEventListener('click', async (ev)=>{
+  const t = ev.target.closest('button');
+  if(!t) return;
+
+  // uitdaging plaatsen
+  if(t.dataset.plaats){
+    const mid = Number(t.dataset.plaats);
+    const m = sbWedstrijdVan(mid);
+    const keuze = document.querySelector(`[data-keuzevoor="${mid}"]`).value;
+    const inzet = parseInt(document.querySelector(`[data-inzetvoor="${mid}"]`).value, 10);
+    if(!Number.isInteger(inzet) || inzet < 1 || inzet > 100){
+      toonStatus('sbStatus','fout','Vul een heel bedrag in tussen €1 en €100.'); return;
+    }
+    if(!confirm(`Uitdaging plaatsen: €${inzet} op ${SB_LABEL[keuze]} bij ${m.thuis} — ${m.uit}?`)) return;
+    try{
+      await sbPost({ actie:'plaats', deelnemer:sbSessie, wachtwoord:sbSessieWw, keuze, inzet,
+        wedstrijd:{ id:m.id, thuis:m.thuis, uit:m.uit, aftrap:m.aftrap, speelronde:sbRonde } });
+      const link = sbBunqLink(inzet, `Side Bet ${m.thuis}-${m.uit} ${sbSessie}`);
+      toonStatus('sbStatus','info', link
+        ? `Uitdaging geplaatst ✓ — <a href="${link}" target="_blank" rel="noopener" style="color:var(--amber)">betaal hier je €${inzet}</a>`
+        : 'Uitdaging geplaatst ✓');
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+
+  // aanhaken
+  if(t.dataset.haak){
+    const id = t.dataset.haak, keuze = t.dataset.keuze;
+    const w = sbData.weddenschappen.find(x=>x.id===id);
+    if(!w) return;
+    if(!confirm(`Aanhaken tegen ${w.uitdager} met ${SB_LABEL[keuze]} voor €${w.inzet}?`)) return;
+    try{
+      await sbPost({ actie:'haak', deelnemer:sbSessie, wachtwoord:sbSessieWw, id, keuze });
+      const link = sbBunqLink(w.inzet, `Side Bet ${w.thuis}-${w.uit} ${sbSessie}`);
+      toonStatus('sbStatus','info', link
+        ? `Je doet mee ✓ — <a href="${link}" target="_blank" rel="noopener" style="color:var(--amber)">betaal hier je €${w.inzet}</a>`
+        : 'Je doet mee ✓');
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+
+  // intrekken
+  if(t.dataset.intrek){
+    if(!confirm('Je uitdaging intrekken?')) return;
+    try{
+      await sbPost({ actie:'intrek', deelnemer:sbSessie, wachtwoord:sbSessieWw, id:t.dataset.intrek });
+      toonStatus('sbStatus','info','Uitdaging ingetrokken ✓');
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+
+  // admin: betaald / uitbetaald
+  if(t.dataset.betaald){
+    try{
+      await sbPost({ actie:'betaald', id:t.dataset.betaald, wie:t.dataset.wie, waarde:t.dataset.waarde==='1' });
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+  if(t.dataset.afgerekend){
+    try{
+      await sbPost({ actie:'afgerekend', id:t.dataset.afgerekend, waarde:t.dataset.waarde==='1' });
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+});
+
+if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
+  const naam = $('sbNaam').value;
+  const team = data.teams[naam];
+  if(team && team.wachtwoord && $('sbWw').value !== team.wachtwoord){
+    toonStatus('sbSessieStatus','fout','Wachtwoord klopt niet.'); return;
+  }
+  sbSessie = naam;
+  sbSessieWw = (team && team.wachtwoord) ? $('sbWw').value : '';
+  $('sbAfmelden').classList.remove('sb-verborgen');
+  toonStatus('sbSessieStatus','info', `Aangemeld als <strong>${esc(naam)}</strong> ✓`);
+  renderSidebets();
+});
+if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
+  sbSessie = null; sbSessieWw = '';
+  $('sbAfmelden').classList.add('sb-verborgen');
+  verbergStatus('sbSessieStatus');
+  renderSidebets();
+});
+
+if($('sbVorige')) $('sbVorige').addEventListener('click', async ()=>{
+  if(sbRonde > 1){ await laadSbWedstrijden(sbRonde - 1); renderSidebets(); }
+});
+if($('sbVolgende')) $('sbVolgende').addEventListener('click', async ()=>{
+  await laadSbWedstrijden(sbRonde + 1); renderSidebets();
+});
+
+if($('sbToggleActief')) $('sbToggleActief').addEventListener('click', async ()=>{
+  try{
+    await sbPost({ actie:'instellingen', actief: !sbData.actief });
+    toonStatus('sbAdminStatus','info', sbData.actief ? 'Side Bets staat open voor deelnemers ✓' : 'Side Bets weer verborgen.');
+    sbToonTab(); renderSidebets();
+  }catch(e){ toonStatus('sbAdminStatus','fout', esc(e.message)); }
+});
+if($('sbBewaarBunq')) $('sbBewaarBunq').addEventListener('click', async ()=>{
+  try{
+    await sbPost({ actie:'instellingen', bunqNaam: $('sbBunqNaam').value });
+    toonStatus('sbAdminStatus','info','bunq.me-naam opgeslagen ✓');
+  }catch(e){ toonStatus('sbAdminStatus','fout', esc(e.message)); }
+});
+
+/* Tabzichtbaarheid meeliften op de bestaande render, zonder je code te wijzigen */
+if(typeof renderAlles === 'function'){
+  const _sbOrigRender = renderAlles;
+  renderAlles = function(){ _sbOrigRender.apply(this, arguments); sbToonTab(); };
+}
+
+/* opstarten */
+(async ()=>{
+  await laadSidebets();
+  await laadSbWedstrijden();
+  renderSidebets();
+  // elke 2 minuten verversen zodat uitslagen vanzelf binnenkomen
+  setInterval(async ()=>{ await laadSidebets(); await laadSbWedstrijden(sbRonde); renderSidebets(); }, 120000);
 })();
 </script>
 </body>
