@@ -11,7 +11,7 @@ import { getStore } from "@netlify/blobs";
 const MAX_INZET = 100;
 const KEUZES = ["thuis", "gelijk", "uit"];
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", weddenschappen: [] });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [] });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -29,7 +29,11 @@ export default async (req) => {
 
   if (req.method === "GET") {
     const sb = await laad();
-    return Response.json(sb, { headers: { "cache-control": "no-store" } });
+    // Uitbetaalgegevens (IBAN's!) nooit publiek meesturen — alleen de namen
+    // van wie iets ingevuld heeft, zodat de app kan tonen wie nog moet.
+    const { uitbetaal, ...publiek } = sb;
+    publiek.heeftUitbetaal = Object.keys(uitbetaal || {});
+    return Response.json(publiek, { headers: { "cache-control": "no-store" } });
   }
 
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -53,6 +57,7 @@ export default async (req) => {
   }
 
   const bewaar = async () => { await store.set("sidebets", JSON.stringify(sb)); };
+  const schoonAntwoord = (o) => { const { uitbetaal, ...p } = o; p.heeftUitbetaal = Object.keys(uitbetaal || {}); return p; };
 
   try {
     // ================= ADMIN-ACTIES =================
@@ -82,7 +87,34 @@ export default async (req) => {
       }
 
       await bewaar();
-      return Response.json({ ok: true, sidebets: sb });
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
+    // ================= EIGEN UITBETAALGEGEVENS =================
+    // Vrij veld: bunq.me-naam, een betaalverzoek-link (Tikkie/ING/Rabo) of IBAN.
+    if (body.actie === "betaalnaam") {
+      const { deelnemer, wachtwoord } = body;
+      const fout = controleerDeelnemer(deelnemer, wachtwoord);
+      if (fout) return Response.json({ fout }, { status: 401 });
+      if (!deelnemer) return Response.json({ fout: "Geen deelnemer opgegeven." }, { status: 400 });
+      if (!sb.uitbetaal) sb.uitbetaal = {};
+      const schoon = String(body.gegevens ?? body.bunqNaam ?? "").trim().slice(0, 120);
+      if (schoon) sb.uitbetaal[deelnemer] = schoon;
+      else delete sb.uitbetaal[deelnemer];
+      await bewaar();
+      const { uitbetaal, ...publiek } = sb;
+      publiek.heeftUitbetaal = Object.keys(uitbetaal || {});
+      return Response.json({ ok: true, sidebets: publiek, eigen: schoon });
+    }
+
+    // Uitbetaalgegevens opvragen: admin krijgt alles, een speler alleen zichzelf.
+    if (body.actie === "haalbetaalgegevens") {
+      const { deelnemer, wachtwoord } = body;
+      if (isAdmin) return Response.json({ ok: true, uitbetaal: sb.uitbetaal || {} });
+      const fout = controleerDeelnemer(deelnemer, wachtwoord);
+      if (fout) return Response.json({ fout }, { status: 401 });
+      const eigen = (sb.uitbetaal || {})[deelnemer] || "";
+      return Response.json({ ok: true, uitbetaal: eigen ? { [deelnemer]: eigen } : {} });
     }
 
     // ================= UITDAGING PLAATSEN =================
@@ -137,7 +169,7 @@ export default async (req) => {
       });
 
       await bewaar();
-      return Response.json({ ok: true, sidebets: sb });
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
     // ================= AANHAKEN =================
@@ -154,6 +186,7 @@ export default async (req) => {
       const w = sb.weddenschappen.find(x => x.id === id);
       if (!w) return Response.json({ fout: "Deze uitdaging bestaat niet meer." }, { status: 404 });
       if (w.tegenstander) return Response.json({ fout: "Iemand anders was je net voor — deze uitdaging is al vergeven." }, { status: 409 });
+      if (!w.betaaldUitdager) return Response.json({ fout: "Deze uitdaging staat nog niet vast — de inzet is nog niet bevestigd." }, { status: 403 });
       if (w.uitdager === deelnemer) return Response.json({ fout: "Je kunt niet tegen jezelf wedden." }, { status: 400 });
       if (!KEUZES.includes(keuze)) return Response.json({ fout: "Ongeldige keuze." }, { status: 400 });
       if (keuze === w.keuzeUitdager) return Response.json({ fout: "Je moet een andere uitkomst kiezen dan je tegenstander." }, { status: 400 });
@@ -166,7 +199,7 @@ export default async (req) => {
       w.gematchtOp = new Date().toISOString();
 
       await bewaar();
-      return Response.json({ ok: true, sidebets: sb });
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
     // ================= EIGEN UITDAGING INTREKKEN =================
@@ -187,7 +220,7 @@ export default async (req) => {
 
       sb.weddenschappen = sb.weddenschappen.filter(x => x.id !== id);
       await bewaar();
-      return Response.json({ ok: true, sidebets: sb });
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
     return Response.json({ fout: "Onbekende actie." }, { status: 400 });
