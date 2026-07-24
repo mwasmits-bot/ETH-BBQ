@@ -68,6 +68,7 @@
   .tab.actief{background:var(--amber);border-color:var(--amber);color:#1C1607}
   .tab:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   .tab.verborgen{display:none}
+  .sb-verborgen{display:none}
 
   section.paneel{display:none}
   section.paneel.actief{display:block}
@@ -107,9 +108,25 @@
     border:1.5px solid var(--line);border-radius:10px;padding:9px 14px}
   .telt-toggle input{width:17px;height:17px;accent-color:var(--amber);cursor:pointer}
   .telt-toggle span{font-size:14px}
-  input[type=number],input[type=text],input[type=password],input[type=email],select{
+  input[type=number],input[type=text],input[type=password],input[type=email],select,textarea{
     background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);
     font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px;width:100%}
+  textarea:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
+  .mail-ontvangers{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+  .mail-balk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 2px}
+  .mail-aanhef{font-size:13px;color:var(--chalk-dim);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+  .mail-aanhef input{width:16px;height:16px;accent-color:var(--amber);cursor:pointer}
+  .mail-lijst{display:grid;gap:6px;margin:8px 0 4px}
+  .mail-rij{display:flex;align-items:center;gap:10px;padding:8px 11px;background:var(--pitch-deep);border:1px solid var(--line);border-radius:9px}
+  .mail-rij.geenmail{opacity:.5}
+  .mail-rij input[type=checkbox]{width:17px;height:17px;accent-color:var(--amber);cursor:pointer;flex:0 0 auto}
+  .mail-rij .mr-naam{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.02em;min-width:110px}
+  .mail-rij .mr-adres{flex:1;min-width:0;font-size:13px;color:var(--chalk-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mail-rij .mr-knop{flex:0 0 auto}
+  .mail-chip{font-size:13px;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line);
+    color:var(--chalk-dim);background:var(--pitch-deep)}
+  .mail-chip.ok{border-color:rgba(255,179,0,.4);color:var(--amber);background:var(--amber-soft)}
+  .mail-chip.mist{border-color:rgba(224,85,72,.4);color:var(--red);background:var(--red-soft)}
   input[type=number]{width:90px;font-family:'Barlow Condensed';font-weight:700;font-size:18px;text-align:center}
   select{cursor:pointer;appearance:auto}
   input:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
@@ -196,6 +213,36 @@
   .modal{background:var(--pitch-card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;max-width:380px;width:100%}
   .modal h2{margin-bottom:6px}
   .modal p{color:var(--chalk-dim);font-size:14px;margin-bottom:14px}
+
+  /* ===== BBQ-datumprikker ===== */
+  #p-datumprikker select,#p-datumprikker input[type=password]{background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px;width:100%}
+  .dp-best{background:linear-gradient(135deg,var(--amber-soft),transparent);border:1px solid rgba(255,179,0,.4);border-radius:var(--radius);padding:16px 18px}
+  .dp-best .dbd{font-family:'Barlow Condensed';font-weight:800;text-transform:uppercase;letter-spacing:.03em;font-size:26px;line-height:1.05}
+  .dp-best .dbe{color:var(--amber);font-size:13px;margin-top:3px}
+  .dp-best .dbc{margin-top:9px;font-size:14px;color:var(--chalk-dim)}
+  .dp-best .dbc b{color:var(--chalk)}
+  .dp-kaart{background:var(--pitch-deep);border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px}
+  .dp-kaart .dk-kop{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .dp-kaart .dk-dat{font-family:'Barlow Condensed';font-weight:700;font-size:17px;letter-spacing:.02em}
+  .dp-kaart .dk-ev{color:var(--amber);font-size:12px;margin-top:1px}
+  .dp-kaart .dk-tel{font-size:13px;color:var(--chalk-dim);white-space:nowrap}
+  .dp-kaart .dk-tel b{color:var(--chalk)}
+  .dp-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .dp-chip{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--chalk)}
+  .dp-chip.ja{background:rgba(46,160,90,.24);border-color:rgba(46,160,90,.55)}
+  .dp-chip.nee{background:var(--red-soft);border-color:rgba(224,85,72,.5);text-decoration:line-through;opacity:.85}
+  .dp-chip.misschien{background:var(--amber-soft);border-color:rgba(255,179,0,.5)}
+  .dp-chip.leeg{color:var(--chalk-dim);opacity:.5}
+  .dp-rij{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid var(--line)}
+  .dp-rij:last-child{border-bottom:none}
+  .dp-rij .dr-l{flex:1;min-width:150px}
+  .dp-rij .dr-d{font-family:'Barlow Condensed';font-weight:700;font-size:16px}
+  .dp-rij .dr-e{color:var(--amber);font-size:11px}
+  .dp-knoppen{display:flex;gap:6px}
+  .dp-knoppen button{border:1.5px solid var(--line);background:transparent;color:var(--chalk-dim);border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif}
+  .dp-knoppen button.aan.ja{background:#2EA05A;color:#fff;border-color:#2EA05A}
+  .dp-knoppen button.aan.nee{background:var(--red);color:#fff;border-color:var(--red)}
+  .dp-knoppen button.aan.misschien{background:var(--amber);color:#20170a;border-color:var(--amber)}
 </style>
 </head>
 <body>
@@ -223,9 +270,12 @@
     <button class="tab" data-doel="p-hof">Hall of Fame</button>
     <button class="tab" data-doel="p-reglement">📋 Reglement</button>
     <button class="tab" data-doel="p-orakel">🔮 Het Eredivisie Orakel</button>
+    <button class="tab" data-doel="p-datumprikker">🔥 BBQ-datumprikker</button>
+    <button class="tab verborgen sb" data-doel="p-sidebets">🎲 Side Bets</button>
     <button class="tab verborgen adm" data-doel="p-upload">Ronde toevoegen</button>
     <button class="tab verborgen adm" data-doel="p-teams">Selecties</button>
     <button class="tab verborgen adm" data-doel="p-tips">Mail-tips</button>
+    <button class="tab verborgen adm" data-doel="p-mail">✉️ Mailen</button>
     <button class="tab verborgen adm" data-doel="p-instellingen">Instellingen</button>
   </nav>
 
@@ -352,6 +402,7 @@
         <h3>1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
         <div id="orakelTeams"></div>
         <h3 style="margin-top:20px">2 · Top 3 topscorers</h3>
+        <p class="uitleg" style="font-size:14px">Typ de namen van de drie spelers die volgens jou de meeste doelpunten maken. Schrijf ze zo volledig mogelijk (bijv. "Brian Brobbey").</p>
         <table class="editor" style="max-width:480px">
           <tr><td style="width:36px;font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--amber)">1</td><td><input type="text" id="orakelTs1" placeholder="Dé topscorer"></td></tr>
           <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">2</td><td><input type="text" id="orakelTs2" placeholder="Nummer 2"></td></tr>
@@ -396,7 +447,119 @@
       <h3 style="margin-top:18px">Ingediende voorspellingen</h3>
       <div id="orakelAdminVoorspellingen"></div>
       <div class="status" id="orakelAdminStatus"></div>
+
+      <h3 style="margin-top:22px">Topscorers koppelen</h3>
+      <p class="uitleg">Iemand typt "Smik", terwijl de officiële topscorerslijst "Brian Brobbey" zegt? Koppel de getypte naam hier aan de echte naam — dan telt de score vanzelf mee, zonder dat je goals hoeft bij te houden. Namen die al goed gespeld zijn hoef je niet te koppelen.</p>
+      <div class="rondekop">
+        <input type="text" id="aliasGetypt" placeholder="Getypte naam (bijv. Smik)" style="min-width:180px">
+        <input type="text" id="aliasEcht" placeholder="Officiële naam (bijv. Brian Brobbey)" style="min-width:220px">
+        <button class="actie mini" id="btnAliasToevoegen">+ Koppelen</button>
+      </div>
+      <div id="aliasLijst"></div>
+      <div class="status" id="aliasStatus"></div>
     </div>
+  </section>
+
+  <!-- ============ BBQ-DATUMPRIKKER ============ -->
+  <section class="paneel" id="p-datumprikker">
+    <div class="card" style="border-left:3px solid var(--amber)">
+      <h2>🔥 BBQ-datumprikker <span style="font-size:14px;color:var(--chalk-dim);text-transform:none;letter-spacing:0">seizoen 2026/27</span></h2>
+      <p class="uitleg">Stem alvast op geschikte BBQ-data. De opties lopen vanaf het weekend ná de laatste speelronde (23 mei) t/m halverwege juli — elke zaterdag en zondag.</p>
+      <p class="uitleg" style="margin-bottom:0">📺 <strong>Even op de kalender:</strong> Europa League-finale wo 26 mei &middot; Conference League-finale wo 2 juni (beide doordeweeks) &middot; <strong style="color:var(--amber)">Champions League-finale za 5 juni</strong> (valt op een BBQ-weekend!) &middot; WK vrouwen in Brazilië vanaf 24 juni (late avond-/nachtwedstrijden hier).</p>
+    </div>
+
+    <div class="card">
+      <h2>🥇 Beste datum <span style="font-size:14px;color:var(--chalk-dim);text-transform:none;letter-spacing:0">meeste &ldquo;ja&rdquo;</span></h2>
+      <div id="dpBest"></div>
+    </div>
+
+    <div class="card">
+      <h2>📅 Alle opties <span id="dpVoteCount" style="font-size:14px;color:var(--chalk-dim);text-transform:none;letter-spacing:0"></span></h2>
+      <div class="knoppenrij" style="justify-content:flex-end;margin-top:0"><button class="actie stil mini" id="dpVervers">↻ Ververs</button></div>
+      <div id="dpOverzicht"></div>
+    </div>
+
+    <div class="card" id="dpLoginCard">
+      <h2>✍️ Zelf stemmen</h2>
+      <div class="rondekop">
+        <div style="min-width:200px"><label for="dpWie">Ik ben</label><br><select id="dpWie"></select></div>
+        <div id="dpWwWrap" style="display:none;min-width:180px"><label for="dpWw">Wachtwoord</label><br><input type="password" id="dpWw" placeholder=""></div>
+        <div><button class="actie" id="dpLoginBtn">Inloggen</button></div>
+      </div>
+      <div class="status" id="dpLoginStatus"></div>
+    </div>
+
+    <div class="card" id="dpStemCard" style="display:none">
+      <h2 id="dpStemTitel">Mijn beschikbaarheid</h2>
+      <div id="dpAdminKiesWrap" class="rondekop" style="display:none">
+        <div style="min-width:220px"><label for="dpAdminKies">Stem invullen namens</label><br><select id="dpAdminKies"></select></div>
+      </div>
+      <div id="dpStemRijen"></div>
+      <div class="status" id="dpStemStatus"></div>
+      <div class="knoppenrij"><button class="actie stil mini" id="dpUitloggen">Uitloggen</button></div>
+      <p class="uitleg" style="margin-top:12px">Je keuze wordt meteen opgeslagen en is direct zichtbaar voor iedereen.</p>
+    </div>
+  </section>
+
+  <section class="paneel" id="p-sidebets">
+
+    <div class="card" style="border-left:3px solid var(--amber)">
+      <h2>🎲 Side Bets</h2>
+      <p class="uitleg">Daag elkaar uit op de uitslag van een Eredivisiewedstrijd. Je plaatst een uitdaging met je keuze en je inzet; een ander haakt aan met een <strong>andere</strong> uitkomst. Wie gelijk heeft, wint de hele pot. Heeft niemand van de twee gelijk, dan krijgt iedereen zijn inzet terug.</p>
+      <p class="uitleg" style="margin-bottom:0">Inzet in hele euro's, maximaal €100. Inzetten sluit automatisch bij het aanfluiten. De poule houdt niets in — alles gaat één op één tussen de twee spelers.</p>
+    </div>
+
+    <!-- admin-instellingen -->
+    <div class="card sb-verborgen" id="sbAdminCard">
+      <h2>Beheer</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+        <button class="knop" id="sbToggleActief">—</button>
+        <label style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--chalk-dim);font-size:14px">bunq.me-naam</span>
+          <input id="sbBunqNaam" placeholder="bijv. mwasmits" style="width:160px">
+        </label>
+        <button class="knop" id="sbBewaarBunq">Opslaan</button>
+      </div>
+      <p class="uitleg" style="margin-bottom:0">De bunq.me-naam is het stukje achter bunq.me/ in je eigen betaallink. Vul je die in, dan krijgt elke speler een kant-en-klaar betaalverzoek te zien.</p>
+      <div class="status" id="sbAdminStatus"></div>
+    </div>
+
+    <!-- wie ben je -->
+    <div class="card" id="sbSessieCard">
+      <h2>Wie ben je?</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <select id="sbNaam" style="min-width:180px"></select>
+        <input id="sbWw" type="password" placeholder="wachtwoord (indien ingesteld)" style="width:220px">
+        <button class="knop primair" id="sbAanmelden">Aanmelden</button>
+        <button class="knop sb-verborgen" id="sbAfmelden">Afmelden</button>
+      </div>
+      <div id="sbEigenBunq" class="sb-verborgen" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span style="color:var(--chalk-dim);font-size:14px">Uitbetaling <em>(optioneel)</em></span>
+        <input id="sbEigenBunqNaam" placeholder="je bunq.me-naam" style="width:220px">
+        <button class="knop" id="sbBewaarEigenBunq">Opslaan</button>
+        <span style="color:var(--chalk-dim);font-size:12px;flex-basis:100%">Heb je bunq? Vul je bunq.me-naam in, dan gaat uitbetalen met \u00e9\u00e9n klik. Laat je dit leeg, dan betaalt de beheerder je terug op de rekening waarvan je hebt ingelegd. Alleen jij en de beheerder kunnen dit zien.</span>
+      </div>
+      <div class="status" id="sbSessieStatus"></div>
+    </div>
+
+    <!-- wedstrijden -->
+    <div class="card">
+      <h2>Wedstrijden</h2>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+        <button class="knop" id="sbVorige">‹ vorige</button>
+        <strong id="sbRondeLabel" style="color:var(--amber)">—</strong>
+        <button class="knop" id="sbVolgende">volgende ›</button>
+      </div>
+      <div id="sbWedstrijden"><p class="uitleg">Laden…</p></div>
+      <div class="status" id="sbStatus"></div>
+    </div>
+
+    <!-- saldo -->
+    <div class="card">
+      <h2>Tussenstand in euro's</h2>
+      <div id="sbSaldo"></div>
+    </div>
+
   </section>
 
   <!-- ============ RONDE TOEVOEGEN (admin) ============ -->
@@ -534,13 +697,73 @@
     </div>
   </section>
 
+  <!-- ============ MAILEN (admin) ============ -->
+  <section class="paneel" id="p-mail">
+    <div class="card">
+      <h2>✉️ Mailen naar de poule</h2>
+      <p class="uitleg">Stel hieronder een bericht samen en open het met één klik in je eigen mailprogramma (Gmail, Outlook, Apple Mail…), met alle deelnemers al ingevuld. Er wordt <strong>niets automatisch verstuurd</strong> — jij drukt zelf op verzenden. De adressen komen uit <strong>Instellingen → Deelnemers beheren</strong>.</p>
+
+      <div id="mailOntvangers" class="mail-ontvangers"></div>
+
+      <div class="mail-balk">
+        <button class="actie stil mini" id="btnMailAlles">Alles aanvinken</button>
+        <button class="actie stil mini" id="btnMailNiets">Niets aanvinken</button>
+        <label class="mail-aanhef" for="mailAanhef"><input type="checkbox" id="mailAanhef" checked> Persoonlijke aanhef bij één ontvanger</label>
+      </div>
+      <div id="mailLijst" class="mail-lijst"></div>
+
+      <div class="rondekop" style="margin-top:6px">
+        <div style="min-width:200px">
+          <label for="mailKeuze">Kies een bericht</label><br>
+          <select id="mailKeuze">
+            <option value="tussenstand">📊 Tussenstand</option>
+            <option value="ronde">⚡ Laatste ronde</option>
+            <option value="orakel">🔮 Orakel-herinnering</option>
+            <option value="vrij">✍️ Vrij bericht</option>
+          </select>
+        </div>
+        <div style="min-width:180px">
+          <label for="mailModus">Adressering</label><br>
+          <select id="mailModus">
+            <option value="bcc">Bcc — privacy (aanrader)</option>
+            <option value="to">Aan — iedereen ziet elkaar</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <label for="mailOnderwerp">Onderwerp</label><br>
+        <input type="text" id="mailOnderwerp" placeholder="Onderwerp van de mail">
+      </div>
+      <div style="margin-top:12px">
+        <label for="mailTekst">Bericht</label><br>
+        <textarea id="mailTekst" rows="13" placeholder="Je bericht…" style="resize:vertical"></textarea>
+      </div>
+
+      <div class="knoppenrij" style="margin-top:14px">
+        <button class="actie" id="btnMailVerstuur">🚀 Direct versturen vanuit de app</button>
+        <button class="actie stil" id="btnMailOpen">✉️ Open in mailprogramma</button>
+        <button class="actie stil mini" id="btnMailKopieerAdres">📋 Adressen kopiëren</button>
+        <button class="actie stil mini" id="btnMailKopieerTekst">📋 Bericht kopiëren</button>
+        <button class="actie stil mini" id="btnMailHerbouw">↻ Bericht opnieuw opbouwen</button>
+      </div>
+      <div class="status" id="mailStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>💡 Later: automatisch versturen</h2>
+      <p class="uitleg">Deze mailfunctie werkt meteen, zonder extra instellingen of kosten. Wil je later e-mails <strong>volautomatisch vanuit de server</strong> laten versturen (bijvoorbeeld elke maandag de tussenstand, zonder dat je zelf iets hoeft te doen)? Dan koppelen we een mailservice zoals Resend of SendGrid via een Netlify-functie. De adressen die je nu opslaat, zijn daar al klaar voor.</p>
+    </div>
+  </section>
+
   <!-- ============ INSTELLINGEN (admin) ============ -->
   <section class="paneel" id="p-instellingen">
     <div class="card">
       <h2>Deelnemers beheren</h2>
-      <p class="uitleg">Voeg deelnemers handmatig toe. Als je een wachtwoord instelt, moet dié persoon dat invullen als ze in het Orakel hun voorspelling doen — zo voorkom je dat iemand anders voor de grap als hen inlogt.</p>
+      <p class="uitleg">Voeg deelnemers handmatig toe. Vul meteen een <strong>e-mailadres</strong> in (of laat leeg en vul het later via Bewerken) — die adressen worden onthouden en gebruik je op het tabblad <strong>✉️ Mailen</strong>. Als je een wachtwoord instelt, moet dié persoon dat invullen als ze in het Orakel hun voorspelling doen — zo voorkom je dat iemand anders voor de grap als hen inlogt.</p>
       <div class="rondekop">
-        <input type="text" id="nieuwDeelnemer" placeholder="Naam" style="min-width:160px">
+        <input type="text" id="nieuwDeelnemer" placeholder="Naam" style="min-width:150px">
+        <input type="email" id="nieuwEmail" placeholder="E-mailadres (optioneel)" style="min-width:200px;flex:1">
         <div style="position:relative;min-width:180px">
           <input type="password" id="nieuwWachtwoord" placeholder="Wachtwoord (optioneel)" style="min-width:180px;padding-right:36px">
           <button type="button" id="toggleWachtwoord" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--chalk-dim);cursor:pointer;font-size:16px">👁</button>
@@ -762,7 +985,7 @@ function optimaleOpstelling(spelers, superweekend){
 /* =============== renderen =============== */
 function renderAlles(){
   renderPrijzenkast(); renderStanden(); renderChart(); renderMatrix();
-  renderTeamsUI(); renderTips(); renderHof(); renderRondeBeheer(); renderDeelnemers(); renderAdminUI();
+  renderTeamsUI(); renderTips(); renderHof(); renderRondeBeheer(); renderDeelnemers(); renderMail(); renderAdminUI();
 }
 
 /* ---------- rondebeheer ---------- */
@@ -840,6 +1063,7 @@ function renderDeelnemers(){
     const naam = b.dataset.naam;
     const team = data.teams[naam];
     $('nieuwDeelnemer').value = naam;
+    $('nieuwEmail').value = team.email || '';
     $('nieuwWachtwoord').value = team.wachtwoord || '';
     $('nieuwWachtwoord').type = 'text'; // toon het wachtwoord bij bewerken
     $('toggleWachtwoord').textContent = '👁‍🗨';
@@ -860,14 +1084,21 @@ function renderDeelnemers(){
 }
 $('btnDeelnToevoegen').addEventListener('click', async ()=>{
   const naam = $('nieuwDeelnemer').value.trim();
+  const email = $('nieuwEmail').value.trim();
   const ww = $('nieuwWachtwoord').value;
   if(!naam){ toonStatus('deelnStatus','fout','Vul de naam in.'); return; }
+  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    toonStatus('deelnStatus','fout','Dat e-mailadres ziet er niet goed uit — controleer het even.'); return;
+  }
   if(!data.teams) data.teams = {};
   const isNieuw = !data.teams[naam];
-  data.teams[naam] = { email:'', squad:[], wachtwoord:ww };
+  // bestaande gegevens (zoals de selectie) behouden en alleen e-mail + wachtwoord bijwerken
+  const bestaand = data.teams[naam] || { email:'', squad:[], wachtwoord:'' };
+  data.teams[naam] = { ...bestaand, email, squad: bestaand.squad || [], wachtwoord: ww };
   await bewaarData('deelnStatus');
   await laadOrakel();
   $('nieuwDeelnemer').value = '';
+  $('nieuwEmail').value = '';
   $('nieuwWachtwoord').value = '';
   $('nieuwWachtwoord').type = 'password'; // verberg wachtwoord weer
   $('toggleWachtwoord').textContent = '👁';
@@ -876,7 +1107,251 @@ $('btnDeelnToevoegen').addEventListener('click', async ()=>{
   renderDeelnemers();
   renderOrakel();
   renderTeamsUI();
+  renderMail();
   toonStatus('deelnStatus','info', isNieuw ? 'Deelnemer toegevoegd ✓' : 'Deelnemer bijgewerkt ✓');
+});
+
+/* ---------- mailen naar de poule ---------- */
+function mailAdressen(){
+  const metEmail = [], zonderEmail = [];
+  Object.keys(data.teams||{}).sort((a,b)=>a.localeCompare(b,'nl')).forEach(naam=>{
+    const e = (data.teams[naam].email||'').trim();
+    if(e) metEmail.push({naam, email:e}); else zonderEmail.push(naam);
+  });
+  return { metEmail, zonderEmail };
+}
+function laatsteRondeMetScores(){
+  const nrs = rondeNummers().filter(nr=>Object.keys(data.rounds[nr].scores||{}).length);
+  return nrs.length ? nrs[nrs.length-1] : null;
+}
+function tplTussenstand(){
+  const {totaal, gespeeld} = tellingen();
+  const namen = scoreDeelnemers();
+  if(!namen.length) return { onderwerp:'📊 Tussenstand ETH Scorito BBQ', tekst:'Er zijn nog geen meetellende rondes ingevoerd — de eerste stand volgt snel!' };
+  const gesorteerd = [...namen].sort((a,b)=>(totaal[b]||0)-(totaal[a]||0) || a.localeCompare(b,'nl'));
+  const rijen = gesorteerd.map((n,i)=>`${i+1}. ${n} — ${totaal[n]||0} ptn (${gespeeld[n]||0} rondes)`);
+  const koploper = gesorteerd[0], hekkensluiter = gesorteerd[gesorteerd.length-1];
+  const tekst =
+`Mannen,
+
+De tussenstand van de ETH Scorito BBQ:
+
+${rijen.join('\n')}
+
+🏆 Koploper: ${koploper} (${totaal[koploper]||0} ptn)
+🍖 Hekkensluiter: ${hekkensluiter} — jij weet wat je te doen staat richting de BBQ…
+
+Bekijk alles live op ${location.origin}
+
+Groet,
+De organisatie`;
+  return { onderwerp:'📊 Tussenstand ETH Scorito BBQ', tekst };
+}
+function tplRonde(){
+  const nr = laatsteRondeMetScores();
+  if(nr===null) return { onderwerp:'⚡ Uitslag laatste ronde', tekst:'Er is nog geen ronde met scores ingevoerd.' };
+  const scores = data.rounds[nr].scores;
+  const {winnaars, verliezers} = extremen(scores);
+  const gesorteerd = Object.keys(scores).sort((a,b)=>scores[b]-scores[a] || a.localeCompare(b,'nl'));
+  const rijen = gesorteerd.map((n,i)=>`${i+1}. ${n} — ${scores[n]} ptn`);
+  const maxP = Math.max(...Object.values(scores)), minP = Math.min(...Object.values(scores));
+  const tekst =
+`Mannen,
+
+De uitslag van ronde ${nr}:
+
+${rijen.join('\n')}
+
+⚡ Weekprijs: ${winnaars.join(' & ')} met ${maxP} ptn — chapeau!
+📋 Rode lantaarn: ${verliezers.join(' & ')} met ${minP} ptn.
+
+Volledige standen: ${location.origin}
+
+Groet,
+De organisatie`;
+  return { onderwerp:`⚡ Ronde ${nr} — de uitslag`, tekst };
+}
+function tplOrakel(){
+  const o = data.orakel || {};
+  let regel;
+  if(o.deadlineEpoch && Date.now() < o.deadlineEpoch){
+    const ms = o.deadlineEpoch - Date.now();
+    const d = Math.floor(ms/86400000), u = Math.floor((ms%86400000)/3600000);
+    const wanneer = new Date(o.deadlineEpoch).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
+    regel = `Je kunt nog ${d>0? d+' dagen en ':''}${u} uur voorspellen — de deadline is ${wanneer}.`;
+  } else if(o.deadlineEpoch){
+    regel = 'De deadline is inmiddels verstreken — hopelijk heb je op tijd ingediend!';
+  } else {
+    regel = 'Zodra de deadline bekend is, hoor je het — maar begin alvast met nadenken.';
+  }
+  const tekst =
+`Mannen,
+
+Vergeet je voorspelling voor het Eredivisie Orakel niet! ${regel}
+
+Vul hem in op ${location.origin} (tabblad 🔮 Het Eredivisie Orakel).
+
+Succes,
+De organisatie`;
+  return { onderwerp:'🔮 Vergeet je Orakel-voorspelling niet!', tekst };
+}
+function bouwMailBericht(){
+  const keuze = $('mailKeuze').value;
+  let res;
+  if(keuze==='tussenstand') res = tplTussenstand();
+  else if(keuze==='ronde') res = tplRonde();
+  else if(keuze==='orakel') res = tplOrakel();
+  else res = { onderwerp:'', tekst:'' };
+  $('mailOnderwerp').value = res.onderwerp;
+  $('mailTekst').value = res.tekst;
+}
+let mailUitgevinkt = new Set();   // namen die de admin heeft uitgevinkt
+
+function geselecteerdeOntvangers(){
+  return mailAdressen().metEmail.filter(m=>!mailUitgevinkt.has(m.naam));
+}
+function persoonlijkeAanhef(tekst, naam){
+  const regels = String(tekst).split('\n');
+  if(regels.length && /^(mannen|hoi|hallo|beste|dag|heren)\b/i.test(regels[0].trim())){
+    regels[0] = 'Hoi ' + naam + ',';
+  } else {
+    regels.unshift('Hoi ' + naam + ',', '');
+  }
+  return regels.join('\n');
+}
+function openMailto(ontvangers){
+  if(!ontvangers.length){ toonStatus('mailStatus','fout','Geen ontvangers geselecteerd.'); return; }
+  let body = $('mailTekst').value;
+  if(ontvangers.length===1 && $('mailAanhef') && $('mailAanhef').checked){
+    body = persoonlijkeAanhef(body, ontvangers[0].naam);
+  }
+  const onderwerp = encodeURIComponent($('mailOnderwerp').value);
+  const tekst = encodeURIComponent(body);
+  const lijst = ontvangers.map(o=>encodeURIComponent(o.email)).join(',');
+  const modus = ontvangers.length===1 ? 'to' : $('mailModus').value;   // één persoon → gewoon 'aan'
+  const mailto = modus==='bcc'
+    ? `mailto:?bcc=${lijst}&subject=${onderwerp}&body=${tekst}`
+    : `mailto:${lijst}?subject=${onderwerp}&body=${tekst}`;
+  window.location.href = mailto;
+  toonStatus('mailStatus','info', ontvangers.length===1
+    ? `Mailprogramma geopend voor ${esc(ontvangers[0].naam)}. Controleer en druk zelf op verzenden.`
+    : `Mailprogramma geopend met ${ontvangers.length} ontvanger(s). Controleer en druk zelf op verzenden. Opent er niets? Gebruik dan de kopieerknoppen.`);
+}
+
+function renderMail(){
+  const houder = $('mailOntvangers');
+  if(!houder) return;
+  const {metEmail, zonderEmail} = mailAdressen();
+  const gekozen = geselecteerdeOntvangers();
+
+  let html = `<span class="mail-chip ok">📧 ${gekozen.length} van ${metEmail.length} geselecteerd</span>`;
+  if(zonderEmail.length) html += `<span class="mail-chip mist">⚠️ ${zonderEmail.length} zonder e-mail: ${zonderEmail.map(esc).join(', ')}</span>`;
+  if(!metEmail.length && !zonderEmail.length) html = `<span class="mail-chip">Nog geen deelnemers.</span>`;
+  houder.innerHTML = html;
+
+  const lijst = $('mailLijst');
+  if(lijst){
+    const alles = [...metEmail.map(m=>({...m, heeft:true})),
+                   ...zonderEmail.map(n=>({naam:n, email:'', heeft:false}))]
+                  .sort((a,b)=>a.naam.localeCompare(b.naam,'nl'));
+    lijst.innerHTML = alles.length ? alles.map(p=>{
+      if(!p.heeft){
+        return `<div class="mail-rij geenmail">
+          <input type="checkbox" disabled>
+          <span class="mr-naam">${esc(p.naam)}</span>
+          <span class="mr-adres">geen e-mailadres — vul in bij Instellingen</span>
+        </div>`;
+      }
+      const aan = !mailUitgevinkt.has(p.naam) ? 'checked' : '';
+      return `<div class="mail-rij">
+        <input type="checkbox" class="mail-vink" data-naam="${esc(p.naam)}" ${aan}>
+        <span class="mr-naam">${esc(p.naam)}</span>
+        <span class="mr-adres">${esc(p.email)}</span>
+        <button class="actie stil mini mr-knop mail-een" data-naam="${esc(p.naam)}" title="Alleen ${esc(p.naam)} mailen">✉️ Alleen deze</button>
+      </div>`;
+    }).join('') : '<div class="leeg">Nog geen deelnemers.</div>';
+
+    lijst.querySelectorAll('.mail-vink').forEach(v=>v.addEventListener('change', ()=>{
+      if(v.checked) mailUitgevinkt.delete(v.dataset.naam); else mailUitgevinkt.add(v.dataset.naam);
+      renderMail();
+    }));
+    lijst.querySelectorAll('.mail-een').forEach(b=>b.addEventListener('click', ()=>{
+      const naam = b.dataset.naam;
+      const p = mailAdressen().metEmail.find(m=>m.naam===naam);
+      if(p) openMailto([p]);
+    }));
+  }
+
+  // eerste keer of leeg → alvast een bericht klaarzetten
+  if($('mailTekst') && $('mailTekst').value.trim()==='') bouwMailBericht();
+}
+if($('btnMailAlles')) $('btnMailAlles').addEventListener('click', ()=>{ mailUitgevinkt.clear(); renderMail(); });
+if($('btnMailNiets')) $('btnMailNiets').addEventListener('click', ()=>{
+  mailAdressen().metEmail.forEach(m=>mailUitgevinkt.add(m.naam)); renderMail();
+});
+async function kopieerNaarKlembord(tekst, melding){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(tekst); }
+    else {
+      const ta = document.createElement('textarea');
+      ta.value = tekst; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    toonStatus('mailStatus','info', melding);
+  }catch(e){ toonStatus('mailStatus','fout','Kopiëren lukte niet — selecteer en kopieer handmatig.'); }
+}
+if($('mailKeuze')) $('mailKeuze').addEventListener('change', bouwMailBericht);
+if($('btnMailHerbouw')) $('btnMailHerbouw').addEventListener('click', ()=>{ bouwMailBericht(); toonStatus('mailStatus','info','Bericht opnieuw opgebouwd met de laatste cijfers ✓'); });
+const API_MAIL = '/.netlify/functions/mail';
+if($('btnMailVerstuur')) $('btnMailVerstuur').addEventListener('click', async ()=>{
+  if(!isAdmin || !adminWachtwoord){ toonStatus('mailStatus','fout','Log eerst in als admin om te kunnen versturen.'); return; }
+  const gekozen = geselecteerdeOntvangers();
+  if(!gekozen.length){ toonStatus('mailStatus','fout','Je hebt niemand aangevinkt.'); return; }
+  const onderwerp = $('mailOnderwerp').value.trim();
+  const tekst = $('mailTekst').value.trim();
+  if(!onderwerp || !tekst){ toonStatus('mailStatus','fout','Vul een onderwerp en een bericht in.'); return; }
+  const namen = gekozen.map(g=>g.naam).join(', ');
+  if(!confirm(`Nu écht versturen naar ${gekozen.length} ontvanger(s)?\n\n${namen}\n\nOnderwerp: ${onderwerp}`)) return;
+
+  const knop = $('btnMailVerstuur');
+  knop.disabled = true; knop.textContent = '⏳ Bezig met versturen…';
+  toonStatus('mailStatus','info','Bezig met versturen…');
+  try{
+    const persoonlijk = gekozen.length===1 && $('mailAanhef') && $('mailAanhef').checked;
+    const body = persoonlijk ? persoonlijkeAanhef(tekst, gekozen[0].naam) : tekst;
+    const r = await fetch(API_MAIL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-wachtwoord':adminWachtwoord},
+      body: JSON.stringify({
+        ontvangers: gekozen.map(g=>g.email),
+        onderwerp,
+        tekst: body,
+        modus: gekozen.length===1 ? 'to' : $('mailModus').value
+      })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
+    toonStatus('mailStatus','info', `✅ Verstuurd naar ${j.aantal || gekozen.length} ontvanger(s) vanaf ${esc(j.afzender||'je Gmail')}. Kijk in je Verzonden-map.`);
+  }catch(e){
+    toonStatus('mailStatus','fout','Versturen mislukt: ' + esc(e.message) + '. Werkt de mailfunctie nog niet? Gebruik dan "Open in mailprogramma".');
+  }finally{
+    knop.disabled = false; knop.textContent = '🚀 Direct versturen vanuit de app';
+  }
+});
+if($('btnMailOpen')) $('btnMailOpen').addEventListener('click', ()=>{
+  const {metEmail} = mailAdressen();
+  if(!metEmail.length){ toonStatus('mailStatus','fout','Nog geen enkel e-mailadres ingevuld — voeg ze toe bij Instellingen → Deelnemers beheren.'); return; }
+  const gekozen = geselecteerdeOntvangers();
+  if(!gekozen.length){ toonStatus('mailStatus','fout','Je hebt niemand aangevinkt — vink minstens één deelnemer aan.'); return; }
+  openMailto(gekozen);
+});
+if($('btnMailKopieerAdres')) $('btnMailKopieerAdres').addEventListener('click', ()=>{
+  const gekozen = geselecteerdeOntvangers();
+  if(!gekozen.length){ toonStatus('mailStatus','fout','Nog geen e-mailadressen aangevinkt om te kopiëren.'); return; }
+  kopieerNaarKlembord(gekozen.map(m=>m.email).join(', '), `${gekozen.length} adres(sen) gekopieerd ✓ — plak ze in de bcc van je webmail.`);
+});
+if($('btnMailKopieerTekst')) $('btnMailKopieerTekst').addEventListener('click', ()=>{
+  kopieerNaarKlembord($('mailOnderwerp').value + '\n\n' + $('mailTekst').value, 'Onderwerp + bericht gekopieerd ✓');
 });
 
 /* ---------- prijzenkast ---------- */
@@ -1091,7 +1566,7 @@ function renderAdminUI(){
   b.classList.toggle('ingelogd', isAdmin);
   if(!isAdmin){
     const open = document.querySelector('section.paneel.actief');
-    if(open && ['p-upload','p-teams','p-tips','p-instellingen'].includes(open.id)) gaNaarTab('p-standen');
+    if(open && ['p-upload','p-teams','p-tips','p-mail','p-instellingen'].includes(open.id)) gaNaarTab('p-standen');
   }
 }
 $('btnAdmin').addEventListener('click', ()=>{
@@ -1116,6 +1591,7 @@ async function probeerLogin(){
       $('loginOverlay').classList.remove('open');
       await laadReglement();
       await laadOrakel();
+      await laadOrakelTeams();
       renderAlles();
       renderReglement();
       renderOrakel();
@@ -1502,10 +1978,13 @@ $('btnTeamOpslaan').addEventListener('click', async ()=>{
     if(!sp) return;
     squad.push({naam:sp, positie:tr.querySelector('select').value});
   });
-  data.teams[naam] = { email: $('teamEmail').value.trim(), squad };
+  const bestaand = data.teams[naam] || {};
+  data.teams[naam] = { ...bestaand, email: $('teamEmail').value.trim(), squad };
   await bewaarData('teamStatus');
   toonStatus('teamStatus','info','Selectie van '+esc(naam)+' opgeslagen ✓ ('+squad.length+' spelers)');
   renderTips();
+  renderDeelnemers();
+  renderMail();
 });
 
 /* =============== hall of fame =============== */
@@ -1764,7 +2243,35 @@ $('btnReglementOpslaan').addEventListener('click', async ()=>{
 /* =============== het eredivisie orakel =============== */
 const ORAKEL_API = '/.netlify/functions/orakel';
 const STAND_API = '/.netlify/functions/stand';
-let orakelInfo = null;   // {deadline, deadlineEpoch, gepubliceerd, teams, namen, voorspellingen?}
+let orakelInfo = null;
+let orakelTeams = [];
+
+async function laadOrakelTeams(){
+  try{
+    const r = await fetch(STAND_API+'?actie=teams', {cache:'no-store'});
+    if(r.ok){
+      const j = await r.json();
+      orakelTeams = (j.teams||[]).map(t=>t.naam);
+    }
+  }catch(e){}
+}
+
+/* Koppelingen: getypte naam -> officiële naam uit de football-data topscorerslijst.
+   data.aliassen = { "smik": "Brian Brobbey", ... }  (sleutel genormaliseerd) */
+function aliasVoor(getypt){
+  const al = (data && data.aliassen) || {};
+  return al[normO(getypt)] || getypt;
+}
+
+async function laadOrakel(){
+  try{
+    const r = await fetch(ORAKEL_API, { cache:'no-store' });
+    if(r.ok){
+      orakelInfo = await r.json();
+    }
+  }catch(e){}
+}
+
 let liveStand = null;    // {stand:[{positie,naam,logo,punten}], scorers:[{naam,goals}], bijgewerkt}
 let orakelVolgorde = []; // huidige volgorde in het formulier (teamnamen)
 
@@ -1804,7 +2311,7 @@ function orakelScore(v){
   const top3 = (liveStand.scorers||[]).slice(0,3).map(s=>normO(s.naam));
   let topPt = 0;
   (v.topscorers||[]).forEach((naam,i)=>{
-    const n = normO(naam);
+    const n = normO(aliasVoor(naam));
     if(!n) return;
     const inTop3 = top3.some(t=>t.includes(n)||n.includes(t));
     if(inTop3) topPt += 5;
@@ -1973,11 +2480,54 @@ function renderOrakelStand(){
   </div>`;
 }
 
+/* ---------- orakel: topscorers koppelen ---------- */
+function renderAliassen(){
+  const houder = $('aliasLijst');
+  if(!houder) return;
+  const al = data.aliassen || {};
+  const sleutels = Object.keys(al);
+  if(!sleutels.length){ houder.innerHTML = '<div class="leeg">Nog geen koppelingen.</div>'; return; }
+  // getypte namen zoals ze in de voorspellingen staan, voor nette weergave
+  const vs = (orakelInfo && orakelInfo.voorspellingen) || {};
+  const getypteNamen = {};
+  Object.values(vs).forEach(v=>(v.topscorers||[]).forEach(t=>{ getypteNamen[normO(t)] = t; }));
+  houder.innerHTML = `<table class="stand" style="margin-top:12px">
+    <tr><th>Getypt</th><th>Telt als</th><th></th></tr>
+    ${sleutels.map(s=>`<tr>
+      <td>${esc(getypteNamen[s] || s)}</td>
+      <td style="color:var(--chalk-dim)">${esc(al[s])}</td>
+      <td style="text-align:right"><button class="actie gevaar mini alias-weg" data-sleutel="${esc(s)}">Verwijderen</button></td>
+    </tr>`).join('')}
+  </table>`;
+  houder.querySelectorAll('.alias-weg').forEach(b=>b.addEventListener('click', async ()=>{
+    delete data.aliassen[b.dataset.sleutel];
+    await bewaarData('aliasStatus');
+    renderAliassen();
+    renderOrakelStand();
+    toonStatus('aliasStatus','info','Koppeling verwijderd ✓');
+  }));
+}
+
+$('btnAliasToevoegen').addEventListener('click', async ()=>{
+  const getypt = $('aliasGetypt').value.trim();
+  const echt = $('aliasEcht').value.trim();
+  if(!getypt || !echt){ toonStatus('aliasStatus','fout','Vul beide namen in.'); return; }
+  if(!data.aliassen) data.aliassen = {};
+  data.aliassen[normO(getypt)] = echt;
+  await bewaarData('aliasStatus');
+  $('aliasGetypt').value = '';
+  $('aliasEcht').value = '';
+  renderAliassen();
+  renderOrakelStand();
+  toonStatus('aliasStatus','info','Gekoppeld ✓ — de score telt nu mee.');
+});
+
 /* ---------- orakel: admin ---------- */
 function renderOrakelAdmin(){
   const kaart = $('orakelAdminCard');
   kaart.style.display = isAdmin ? 'block' : 'none';
   if(!isAdmin) return;
+  renderAliassen();
   if(data.orakel && data.orakel.deadline) $('orakelDeadlineInput').value = data.orakel.deadline;
   $('btnOrakelPubliceer').textContent = (data.orakel && data.orakel.gepubliceerd)
     ? '🔓 Gepubliceerd — klik om te verbergen' : '🔒 Nog verborgen — klik om te publiceren';
@@ -1999,18 +2549,24 @@ function renderOrakelAdmin(){
     const naam = b.dataset.naam;
     if(!confirm('Voorspelling van '+esc(naam)+' verwijderen?')) return;
     try{
+      console.log('Delete aanvraag:', { naam, wachtwoord: adminWachtwoord ? '***' : 'geen' });
+      const payload = JSON.stringify({ naam });
+      console.log('JSON payload:', payload);
       const r = await fetch(ORAKEL_API+'?verwijder=1', {
         method:'POST',
         headers:{'Content-Type':'application/json', 'x-wachtwoord': adminWachtwoord||''},
-        body: JSON.stringify({ naam })
+        body: payload
       });
-      const j = await r.json().catch(()=>({}));
+      console.log('Response status:', r.status);
+      const j = await r.json().catch((e)=>{ console.error('JSON parse fout:', e); return {}; });
+      console.log('Response body:', j);
       if(!r.ok) throw new Error(j.fout || 'status '+r.status);
       await laadOrakel();
       renderOrakelAdmin();
       renderOrakelStand();
       toonStatus('orakelAdminStatus','info','Voorspelling van '+esc(naam)+' verwijderd ✓');
     }catch(e){
+      console.error('Delete fout:', e);
       toonStatus('orakelAdminStatus','fout','Verwijderen mislukt: '+e.message);
     }
   }));
@@ -2212,15 +2768,677 @@ function renderTipKaarten(){
 }
 $('tipRonde').addEventListener('change', renderTipKaarten);
 
+/* =============== BBQ-datumprikker =============== */
+const DP_API = '/.netlify/functions/datumprikker';
+const BBQ_DATA = [
+  {id:'2027-05-29', label:'Za 29 mei 2027', event:''},
+  {id:'2027-05-30', label:'Zo 30 mei 2027', event:''},
+  {id:'2027-06-05', label:'Za 5 juni 2027', event:'⚽ Champions League-finale (Madrid) — \u0027s avonds op TV'},
+  {id:'2027-06-06', label:'Zo 6 juni 2027', event:''},
+  {id:'2027-06-12', label:'Za 12 juni 2027', event:''},
+  {id:'2027-06-13', label:'Zo 13 juni 2027', event:''},
+  {id:'2027-06-19', label:'Za 19 juni 2027', event:''},
+  {id:'2027-06-20', label:'Zo 20 juni 2027', event:''},
+  {id:'2027-06-26', label:'Za 26 juni 2027', event:'🌎 WK vrouwen (Brazilië) van start'},
+  {id:'2027-06-27', label:'Zo 27 juni 2027', event:'🌎 WK vrouwen (Brazilië)'},
+  {id:'2027-07-03', label:'Za 3 juli 2027', event:'🌎 WK vrouwen (Brazilië)'},
+  {id:'2027-07-04', label:'Zo 4 juli 2027', event:'🌎 WK vrouwen (Brazilië)'},
+  {id:'2027-07-10', label:'Za 10 juli 2027', event:''},
+  {id:'2027-07-11', label:'Zo 11 juli 2027', event:''},
+  {id:'2027-07-17', label:'Za 17 juli 2027', event:''},
+  {id:'2027-07-18', label:'Zo 18 juli 2027', event:''},
+];
+let dpStemmen = {};   // {naam:{id:'ja'|'nee'|'misschien'}}
+let dpSessie = null;  // naam van ingelogde deelnemer (niet-admin)
+let dpSessieWw = '';  // wachtwoord van die deelnemer (voor serverside controle)
+
+async function laadDatumprikker(){
+  try{
+    const r = await fetch(DP_API, {cache:'no-store'});
+    if(r.ok){ const j = await r.json(); dpStemmen = (j && j.stemmen) || {}; }
+  }catch(e){ /* server nog niet actief — UI werkt alsnog */ }
+}
+async function bewaarDpStem(naam){
+  const headers = {'Content-Type':'application/json'};
+  const body = { deelnemer:naam, stemmen: dpStemmen[naam] || {} };
+  if(isAdmin && adminWachtwoord) headers['x-wachtwoord'] = adminWachtwoord; // admin mag namens iedereen
+  else body.wachtwoord = dpSessieWw || '';                                  // deelnemer stuurt eigen wachtwoord
+  const r = await fetch(DP_API, { method:'POST', headers, body: JSON.stringify(body) });
+  if(!r.ok){ const j = await r.json().catch(()=>({})); throw new Error(j.fout || ('status '+r.status)); }
+}
+
+function dpTel(id){
+  let ja=0,nee=0,mis=0;
+  alleDeelnemers().forEach(n=>{
+    const v = dpStemmen[n] && dpStemmen[n][id];
+    if(v==='ja') ja++; else if(v==='nee') nee++; else if(v==='misschien') mis++;
+  });
+  return {ja,nee,mis};
+}
+function dpScore(id){ const c=dpTel(id); return c.ja*3 + c.mis - c.nee*2; }
+
+function renderDatumprikker(){
+  if(!$('dpOverzicht')) return;
+  const namen = alleDeelnemers();
+
+  // login-dropdown vullen
+  const wie = $('dpWie');
+  if(wie){
+    const huidig = wie.value;
+    wie.innerHTML = '<option value="">— kies je naam —</option>' + namen.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    if(huidig && [...wie.options].some(o=>o.value===huidig)) wie.value = huidig;
+  }
+
+  // kaarten tonen op basis van admin / sessie
+  if(isAdmin){
+    $('dpLoginCard').style.display='none';
+    $('dpStemCard').style.display='block';
+    $('dpStemTitel').textContent='Stemmen beheren (admin)';
+    $('dpAdminKiesWrap').style.display= namen.length ? 'flex' : 'none';
+    const ak=$('dpAdminKies'); const h=ak.value;
+    ak.innerHTML = namen.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    if(h && [...ak.options].some(o=>o.value===h)) ak.value=h;
+  } else if(dpSessie){
+    $('dpLoginCard').style.display='none';
+    $('dpStemCard').style.display='block';
+    $('dpStemTitel').textContent='Mijn beschikbaarheid — '+esc(dpSessie);
+    $('dpAdminKiesWrap').style.display='none';
+  } else {
+    $('dpLoginCard').style.display='block';
+    $('dpStemCard').style.display='none';
+  }
+  renderDpStemRijen();
+  renderDpBest();
+  renderDpOverzicht();
+}
+
+function renderDpBest(){
+  const namen = alleDeelnemers();
+  const gestemd = namen.filter(n=>dpStemmen[n] && Object.keys(dpStemmen[n]).length).length;
+  $('dpVoteCount').textContent = gestemd + ' / ' + namen.length + ' gestemd';
+  const el = $('dpBest');
+  const ergensGestemd = namen.some(n=>dpStemmen[n] && Object.keys(dpStemmen[n]).length);
+  if(!namen.length){ el.innerHTML='<div class="leeg">Nog geen deelnemers bekend — voeg eerst rondes of selecties toe.</div>'; return; }
+  if(!ergensGestemd){ el.innerHTML='<div class="leeg">Nog niemand heeft gestemd — wees de eerste hieronder!</div>'; return; }
+  const best = [...BBQ_DATA].sort((a,b)=>dpScore(b.id)-dpScore(a.id))[0];
+  const c = dpTel(best.id);
+  el.innerHTML = `<div class="dp-best">
+    <div class="dbd">🥇 ${best.label}</div>
+    ${best.event?`<div class="dbe">${best.event}</div>`:''}
+    <div class="dbc">✅ <b>${c.ja}</b> ja &nbsp;·&nbsp; 🟠 ${c.mis} misschien &nbsp;·&nbsp; ❌ ${c.nee} nee</div>
+  </div>`;
+}
+
+function renderDpOverzicht(){
+  const namen = alleDeelnemers();
+  const el = $('dpOverzicht');
+  const ranked = [...BBQ_DATA].sort((a,b)=>dpScore(b.id)-dpScore(a.id));
+  el.innerHTML = ranked.map(d=>{
+    const c = dpTel(d.id);
+    const chips = namen.map(n=>{
+      const v = (dpStemmen[n] && dpStemmen[n][d.id]) || 'leeg';
+      return `<span class="dp-chip ${v}">${esc(n)}</span>`;
+    }).join('');
+    return `<div class="dp-kaart">
+      <div class="dk-kop">
+        <div><div class="dk-dat">${d.label}</div>${d.event?`<div class="dk-ev">${d.event}</div>`:''}</div>
+        <div class="dk-tel">✅ <b>${c.ja}</b> · 🟠 ${c.mis} · ❌ ${c.nee}</div>
+      </div>
+      ${namen.length?`<div class="dp-chips">${chips}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function dpHuidigeStemmer(){
+  if(isAdmin){ const ak=$('dpAdminKies'); return ak && ak.value ? ak.value : (alleDeelnemers()[0]||null); }
+  return dpSessie;
+}
+function renderDpStemRijen(){
+  const wrap = $('dpStemRijen'); if(!wrap) return;
+  const naam = dpHuidigeStemmer();
+  if(!naam){ wrap.innerHTML='<div class="leeg">Geen deelnemer geselecteerd.</div>'; return; }
+  const mijn = dpStemmen[naam] || {};
+  wrap.innerHTML = BBQ_DATA.map(d=>{
+    const v = mijn[d.id]||'';
+    const knop=(val,txt)=>`<button class="${v===val?'aan '+val:''}" data-id="${d.id}" data-val="${val}">${txt}</button>`;
+    return `<div class="dp-rij">
+      <div class="dr-l"><div class="dr-d">${d.label}</div>${d.event?`<div class="dr-e">${d.event}</div>`:''}</div>
+      <div class="dp-knoppen">${knop('ja','Ja')}${knop('misschien','Misschien')}${knop('nee','Nee')}</div>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('.dp-knoppen button').forEach(b=>{
+    b.addEventListener('click', ()=>dpStem(b.dataset.id, b.dataset.val));
+  });
+}
+async function dpStem(id, val){
+  const naam = dpHuidigeStemmer(); if(!naam) return;
+  if(!dpStemmen[naam]) dpStemmen[naam]={};
+  if(dpStemmen[naam][id]===val) delete dpStemmen[naam][id]; else dpStemmen[naam][id]=val;
+  renderDpStemRijen(); renderDpBest(); renderDpOverzicht();
+  try{ await bewaarDpStem(naam); verbergStatus('dpStemStatus'); }
+  catch(e){ toonStatus('dpStemStatus','fout', esc(e.message==='status 404'||/reach|fetch/i.test(e.message) ? 'Opslaan lukte niet — is de datumprikker-functie al gedeployed op Netlify?' : e.message)); }
+}
+
+/* login-listeners */
+if($('dpWie')){
+  $('dpWie').addEventListener('change', ()=>{
+    const team = data.teams && data.teams[$('dpWie').value];
+    const heeftWw = !!(team && team.wachtwoord);
+    $('dpWwWrap').style.display = heeftWw ? 'block' : 'none';
+    $('dpWw').value='';
+  });
+  $('dpLoginBtn').addEventListener('click', ()=>{
+    const naam = $('dpWie').value;
+    if(!naam){ toonStatus('dpLoginStatus','fout','Kies eerst wie je bent.'); return; }
+    const team = data.teams && data.teams[naam];
+    if(team && team.wachtwoord && $('dpWw').value !== team.wachtwoord){ toonStatus('dpLoginStatus','fout','Onjuist wachtwoord.'); return; }
+    dpSessie = naam;
+    dpSessieWw = (team && team.wachtwoord) ? $('dpWw').value : '';
+    verbergStatus('dpLoginStatus'); $('dpWw').value='';
+    renderDatumprikker();
+    $('dpStemCard').scrollIntoView({behavior:'smooth'});
+  });
+  $('dpUitloggen').addEventListener('click', ()=>{ dpSessie=null; dpSessieWw=''; verbergStatus('dpStemStatus'); renderDatumprikker(); });
+  $('dpVervers').addEventListener('click', async ()=>{ await laadDatumprikker(); renderDatumprikker(); });
+  const dpTab = document.querySelector('.tab[data-doel="p-datumprikker"]');
+  if(dpTab) dpTab.addEventListener('click', async ()=>{ await laadDatumprikker(); renderDatumprikker(); });
+}
+
 /* =============== start =============== */
 (async ()=>{
   await laadData();
   await laadReglement();
   await laadOrakel();
+  await laadOrakelTeams();
   if(orakelInfo && orakelInfo.gepubliceerd) await laadLiveStand();
   renderAlles();
   renderReglement();
   renderOrakel();
+  await laadDatumprikker();
+  renderDatumprikker();
+})();
+
+/* =============== side bets =============== */
+const SB_API = '/.netlify/functions/sidebets';
+const SB_WED_API = '/.netlify/functions/wedstrijden';
+
+let sbData = { actief:false, bunqNaam:'', weddenschappen:[] };
+let sbWed = { speelronde:null, huidigeRonde:null, wedstrijden:[] };
+let sbRonde = null;
+let sbSessie = null;      // naam van de aangemelde deelnemer
+let sbSessieWw = '';
+
+async function laadSidebets(){
+  try{
+    const r = await fetch(SB_API, { cache:'no-store' });
+    if(r.ok) sbData = await r.json();
+  }catch(e){ /* nog geen data */ }
+  sbToonTab();
+}
+
+async function laadSbWedstrijden(ronde){
+  try{
+    const q = ronde ? ('?ronde='+ronde) : '';
+    const r = await fetch(SB_WED_API+q, { cache:'no-store' });
+    if(r.ok){
+      sbWed = await r.json();
+      sbRonde = sbWed.speelronde;
+    }
+  }catch(e){ /* stil */ }
+}
+
+function sbToonTab(){
+  const knop = document.querySelector('.tab[data-doel="p-sidebets"]');
+  if(!knop) return;
+  knop.classList.toggle('verborgen', !(isAdmin || sbData.actief));
+  const adm = $('sbAdminCard');
+  if(adm) adm.classList.toggle('sb-verborgen', !isAdmin);
+}
+
+async function sbPost(payload){
+  const headers = {'Content-Type':'application/json'};
+  if(isAdmin && adminWachtwoord) headers['x-wachtwoord'] = adminWachtwoord;
+  const r = await fetch(SB_API, { method:'POST', headers, body: JSON.stringify(payload) });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
+  if(j.sidebets) sbData = j.sidebets;
+  return j;
+}
+
+function sbBunqNaamSchoon(ruw){
+  return String(ruw === undefined ? (sbData.bunqNaam||'') : ruw).trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^(www\.)?bunq\.me\//i, '')
+    .replace(/^\/+|\/+$/g, '')
+    .split('/')[0]
+    .split('?')[0];
+}
+function sbBunqLink(bedrag, omschrijving){
+  const naam = sbBunqNaamSchoon();
+  if(!naam) return null;
+  return `https://bunq.me/${encodeURIComponent(naam)}/${bedrag}/${encodeURIComponent(omschrijving)}`;
+}
+
+const SB_LABEL = { thuis:'thuis wint', gelijk:'gelijkspel', uit:'uit wint' };
+
+/* Uitbetaalgegevens staan achter een controle; ze zitten niet in de publieke GET. */
+let sbUitbetaal = {};
+async function sbHaalUitbetaal(){
+  if(!isAdmin && !sbSessie) return;
+  try{
+    const j = await sbPost({ actie:'haalbetaalgegevens', deelnemer:sbSessie, wachtwoord:sbSessieWw });
+    sbUitbetaal = j.uitbetaal || {};
+    if(sbSessie && $('sbEigenBunqNaam') && document.activeElement !== $('sbEigenBunqNaam')){
+      $('sbEigenBunqNaam').value = sbUitbetaal[sbSessie] || '';
+    }
+    renderSidebets();
+  }catch(e){ /* stil */ }
+}
+
+/* Herkent zelf wat iemand heeft ingevuld: bunq.me-naam, een link, of een IBAN. */
+function sbUitbetaalWeergave(waarde, bedrag, omschrijving){
+  const v = String(waarde || '').trim();
+  if(!v) return null;
+  const kaal = v.replace(/\s/g,'');
+  if(/^[A-Za-z]{2}\d{2}[A-Za-z0-9]{8,26}$/.test(kaal)){
+    return { soort:'iban', tekst: v.toUpperCase() };
+  }
+  if(/^https?:\/\//i.test(v) || /^(www\.)?[a-z0-9-]+\.[a-z]{2,}\//i.test(v)){
+    const url = /^https?:\/\//i.test(v) ? v : 'https://'+v;
+    const m = url.match(/bunq\.me\/([^\/?#]+)/i);
+    if(m) return { soort:'link', url:`https://bunq.me/${m[1]}/${bedrag}/${encodeURIComponent(omschrijving)}`, bedragErin:true };
+    return { soort:'link', url, bedragErin:false };
+  }
+  return { soort:'link', url:`https://bunq.me/${encodeURIComponent(v)}/${bedrag}/${encodeURIComponent(omschrijving)}`, bedragErin:true };
+}
+
+/* Betaallink voor één weddenschap. Elke bet krijgt een eigen kenmerk (#xxxxx),
+   zodat je bij vier losse inzetten ziet welke betaling bij welke bet hoort. */
+function sbBetaalKnop(w, naam){
+  const kenmerk = String(w.id).slice(-5);
+  const link = sbBunqLink(w.inzet, `Side Bet ${w.thuis}-${w.uit} ${naam} #${kenmerk}`);
+  if(!link) return '';
+  return `<a class="knop" href="${link}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none">\u{1F4B6} Betaal \u20ac${w.inzet} <span style="opacity:.6">#${kenmerk}</span></a>`;
+}
+
+function sbWedstrijdVan(matchId){
+  return sbWed.wedstrijden.find(w => w.id === matchId) || null;
+}
+
+/* Bepaalt de afloop van één weddenschap.
+   -> {status:'open'|'wacht'|'klaar', winnaar:naam|null, terug:bool} */
+function sbAfloop(w){
+  if(!w.tegenstander) return { status:'open', winnaar:null, terug:false };
+  const m = sbWedstrijdVan(w.matchId);
+  const uitkomst = m ? m.uitkomst : null;
+  if(!uitkomst) return { status:'wacht', winnaar:null, terug:false };
+  if(uitkomst === w.keuzeUitdager) return { status:'klaar', winnaar:w.uitdager, terug:false };
+  if(uitkomst === w.keuzeTegenstander) return { status:'klaar', winnaar:w.tegenstander, terug:false };
+  return { status:'klaar', winnaar:null, terug:true };
+}
+
+function sbGesloten(w){
+  return new Date(w.aftrap).getTime() <= Date.now();
+}
+
+function sbTijd(iso){
+  try{
+    return new Date(iso).toLocaleString('nl-NL', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  }catch(e){ return iso; }
+}
+
+function renderSidebets(){
+  if(!$('sbWedstrijden')) return;
+
+  // deelnemerslijst
+  const sel = $('sbNaam');
+  if(sel){
+    const namen = alleDeelnemers();
+    if(namen.length && sel.dataset.aantal !== String(namen.length)){
+      const huidig = sel.value;
+      sel.innerHTML = namen.map(n=>`<option>${esc(n)}</option>`).join('');
+      if(namen.includes(huidig)) sel.value = huidig;
+      sel.dataset.aantal = String(namen.length);
+    }
+  }
+
+  // admin-knoppen
+  if($('sbToggleActief')){
+    $('sbToggleActief').textContent = sbData.actief
+      ? '🔓 Open voor deelnemers — klik om te sluiten'
+      : '🔒 Alleen zichtbaar voor jou — klik om open te zetten';
+  }
+  if($('sbBunqNaam') && document.activeElement !== $('sbBunqNaam')){
+    $('sbBunqNaam').value = sbData.bunqNaam || '';
+  }
+
+  $('sbRondeLabel').textContent = sbRonde ? ('Speelronde '+sbRonde) : '—';
+
+  // wedstrijden met hun weddenschappen
+  const rows = sbWed.wedstrijden.map(m => {
+    const bets = sbData.weddenschappen.filter(w => w.matchId === m.id);
+    const open = bets.filter(w => !w.tegenstander);
+    const gematcht = bets.filter(w => w.tegenstander);
+    const dicht = new Date(m.aftrap).getTime() <= Date.now();
+
+    let uitslag = '';
+    if(m.status === 'FINISHED'){
+      uitslag = `<strong style="color:var(--amber)">${m.thuisDoelpunten}–${m.uitDoelpunten}</strong>`;
+    } else if(m.status === 'IN_PLAY' || m.status === 'PAUSED'){
+      uitslag = `<span style="color:var(--amber)">bezig…</span>`;
+    } else {
+      uitslag = `<span style="color:var(--chalk-dim)">${esc(sbTijd(m.aftrap))}</span>`;
+    }
+
+    // openstaande uitdagingen
+    const openHtml = open.filter(w =>
+      w.betaaldUitdager || isAdmin || sbSessie === w.uitdager
+    ).map(w => {
+      const magAanhaken = w.betaaldUitdager && sbSessie && sbSessie !== w.uitdager && !dicht;
+      const andere = ['thuis','gelijk','uit'].filter(k => k !== w.keuzeUitdager);
+      const knoppen = magAanhaken
+        ? andere.map(k=>`<button class="knop" data-haak="${w.id}" data-keuze="${k}">Aanhaken met ${SB_LABEL[k]}</button>`).join(' ')
+        : '';
+      const eigen = sbSessie === w.uitdager;
+      const intrek = (eigen && !dicht)
+        ? `<button class="knop" data-intrek="${w.id}">Intrekken</button>`
+        : (eigen && dicht ? '<span style="color:var(--chalk-dim);font-size:13px">Intrekken kan niet meer \u2014 de wedstrijd is begonnen.</span>' : '');
+      const betaalKnop = (eigen && !w.betaaldUitdager) ? sbBetaalKnop(w, w.uitdager) : '';
+      const wachtLink = '';
+      const staat = w.betaaldUitdager
+        ? '<span style="color:var(--chalk-dim)"> — wacht op tegenstander</span>'
+        : `<span style="color:var(--chalk-dim)"> — <em>nog niet zichtbaar voor anderen: inzet niet bevestigd</em>${wachtLink}</span>`;
+      const adminOpen = isAdmin
+        ? `<button class="knop" data-betaald="${w.id}" data-wie="uitdager" data-waarde="${w.betaaldUitdager?0:1}">${w.betaaldUitdager?'✓':'○'} betaling ontvangen</button>
+           <button class="knop" data-verwijder="${w.id}">Verwijderen</button>` : '';
+      return `<div style="padding:8px 0;border-top:1px solid var(--line)">
+        <strong>${esc(w.uitdager)}</strong> zet <strong>€${w.inzet}</strong> op <strong>${SB_LABEL[w.keuzeUitdager]}</strong>
+        ${staat}
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">${betaalKnop}${knoppen}${intrek}${adminOpen}</div>
+      </div>`;
+    }).join('');
+
+    // lopende / afgeronde weddenschappen
+    const matchHtml = gematcht.map(w => {
+      const a = sbAfloop(w);
+      let uitkomstTekst = '<span style="color:var(--chalk-dim)">nog niet gespeeld</span>';
+      if(a.status === 'klaar' && a.terug) uitkomstTekst = '<span style="color:var(--chalk-dim)">niemand goed — inzet terug</span>';
+      else if(a.status === 'klaar') uitkomstTekst = `<strong style="color:var(--amber)">${esc(a.winnaar)} wint €${w.inzet * 2}</strong>`;
+      const betaal = [];
+      if(!w.betaaldUitdager) betaal.push(esc(w.uitdager));
+      if(!w.betaaldTegenstander) betaal.push(esc(w.tegenstander));
+      const betaalTekst = betaal.length
+        ? `<span style="color:var(--chalk-dim)"> · nog niet betaald: ${betaal.join(', ')}</span>` : '';
+      // Uitbetaling: alleen de winnaar (en de beheerder) zien deze knop.
+      let uitbetaalRij = '';
+      if(a.status === 'klaar' && !w.afgerekend){
+        const claims = a.terug
+          ? [[w.uitdager, w.inzet], [w.tegenstander, w.inzet]]
+          : [[a.winnaar, w.inzet * 2]];
+        const stukken = claims.map(([wie, bedrag])=>{
+          const kenmerk = String(w.id).slice(-5);
+          const oms = `Uitbetaling Side Bet ${w.thuis}-${w.uit} #${kenmerk}`;
+          const ingevuld = (sbData.heeftUitbetaal || []).includes(wie);
+          const g = sbUitbetaalWeergave(sbUitbetaal[wie], bedrag, oms);
+
+          if(sbSessie === wie){
+            if(!ingevuld) return `<span style="color:var(--chalk-dim);font-size:13px">Je hebt \u20ac${bedrag} tegoed \u2014 de beheerder maakt het terug naar je eigen rekening.</span>`;
+            if(!g) return `<span style="color:var(--chalk-dim);font-size:13px">Je hebt \u20ac${bedrag} tegoed.</span>`;
+            if(g.soort === 'iban') return `<span class="knop" style="color:var(--amber)">\u{1F3C6} Je krijgt \u20ac${bedrag} op ${esc(g.tekst)}</span>`;
+            return `<a class="knop" href="${g.url}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none">\u{1F3C6} Vraag je \u20ac${bedrag} op${g.bedragErin?'':' (bedrag zelf invullen)'}</a>`;
+          }
+
+          if(isAdmin){
+            if(!ingevuld) return `<span style="color:var(--chalk-dim);font-size:13px">\u20ac${bedrag} naar ${esc(wie)} \u2014 terugbetalen via de oorspronkelijke inleg (kenmerk #${kenmerk}).</span>`;
+            if(!g) return '';
+            if(g.soort === 'iban') return `<span class="knop">Maak \u20ac${bedrag} over aan ${esc(wie)}: ${esc(g.tekst)}</span>`;
+            return `<a class="knop" href="${g.url}" target="_blank" rel="noopener" style="text-decoration:none">Betaal \u20ac${bedrag} aan ${esc(wie)}${g.bedragErin?'':' (bedrag zelf invullen)'}</a>`;
+          }
+          return '';
+        }).filter(Boolean);
+        if(stukken.length) uitbetaalRij = `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${stukken.join('')}</div>`;
+      }
+      let mijnBetaalKnop = '';
+      if(sbSessie === w.uitdager && !w.betaaldUitdager) mijnBetaalKnop = sbBetaalKnop(w, w.uitdager);
+      else if(sbSessie === w.tegenstander && !w.betaaldTegenstander) mijnBetaalKnop = sbBetaalKnop(w, w.tegenstander);
+      const spelerRij = (sbSessie === w.uitdager || sbSessie === w.tegenstander)
+        ? `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+             ${mijnBetaalKnop}
+             <span style="color:var(--chalk-dim);font-size:13px">Intrekken kan niet meer \u2014 er is al iemand aangehaakt. Vraag de beheerder.</span>
+           </div>` : '';
+      const adminKnoppen = isAdmin
+        ? `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+             <button class="knop" data-betaald="${w.id}" data-wie="uitdager" data-waarde="${w.betaaldUitdager?0:1}">${w.betaaldUitdager?'\u2713':'\u25cb'} ${esc(w.uitdager)} betaald</button>
+             <button class="knop" data-betaald="${w.id}" data-wie="tegenstander" data-waarde="${w.betaaldTegenstander?0:1}">${w.betaaldTegenstander?'\u2713':'\u25cb'} ${esc(w.tegenstander)} betaald</button>
+             ${a.status==='klaar' ? `<button class="knop" data-afgerekend="${w.id}" data-waarde="${w.afgerekend?0:1}">${w.afgerekend?'\u2713 uitbetaald':'\u25cb nog uitbetalen'}</button>` : ''}
+             <button class="knop" data-verwijder="${w.id}">Verwijderen</button>
+           </div>` : '';
+      return `<div style="padding:8px 0;border-top:1px solid var(--line)">
+        <strong>${esc(w.uitdager)}</strong> (${SB_LABEL[w.keuzeUitdager]}) vs <strong>${esc(w.tegenstander)}</strong> (${SB_LABEL[w.keuzeTegenstander]}) — €${w.inzet} p.p.
+        <div style="margin-top:4px">${uitkomstTekst}${betaalTekst}</div>
+        ${uitbetaalRij}
+        ${spelerRij}
+        ${adminKnoppen}
+      </div>`;
+    }).join('');
+
+    // nieuwe uitdaging plaatsen
+    const plaatsHtml = (sbSessie && !dicht)
+      ? `<div style="padding:10px 0 2px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+           <select data-keuzevoor="${m.id}">
+             <option value="thuis">${esc(m.thuis)} wint</option>
+             <option value="gelijk">gelijkspel</option>
+             <option value="uit">${esc(m.uit)} wint</option>
+           </select>
+           <input type="number" min="1" max="100" step="1" value="5" data-inzetvoor="${m.id}" style="width:90px" placeholder="€">
+           <button class="knop primair" data-plaats="${m.id}">Uitdaging plaatsen</button>
+         </div>`
+      : (dicht ? '' : `<p class="uitleg" style="margin:8px 0 0">Meld je hierboven aan om een uitdaging te plaatsen.</p>`);
+
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <strong>${esc(m.thuis)} — ${esc(m.uit)}</strong>
+        <span>${uitslag}</span>
+      </div>
+      ${openHtml}${matchHtml}${plaatsHtml}
+    </div>`;
+  }).join('');
+
+  $('sbWedstrijden').innerHTML = rows || '<p class="uitleg">Geen wedstrijden gevonden voor deze speelronde.</p>';
+
+  renderSbSaldo();
+}
+
+function renderSbSaldo(){
+  const saldo = {};
+  const raak = (n,v)=>{ saldo[n] = (saldo[n]||0) + v; };
+
+  sbData.weddenschappen.forEach(w=>{
+    if(!w.tegenstander) return;
+    const a = sbAfloop(w);
+    if(a.status !== 'klaar' || a.terug) return;
+    const verliezer = a.winnaar === w.uitdager ? w.tegenstander : w.uitdager;
+    raak(a.winnaar, w.inzet);
+    raak(verliezer, -w.inzet);
+  });
+
+  const namen = Object.keys(saldo).sort((a,b)=> saldo[b]-saldo[a]);
+  if(!namen.length){ $('sbSaldo').innerHTML = '<p class="uitleg">Nog geen afgeronde weddenschappen.</p>'; return; }
+
+  $('sbSaldo').innerHTML = `<table><thead><tr><th>Deelnemer</th><th style="text-align:right">Saldo</th></tr></thead><tbody>`
+    + namen.map(n=>{
+        const v = saldo[n];
+        const kleur = v > 0 ? 'var(--amber)' : (v < 0 ? 'rgba(255,120,120,.9)' : 'var(--chalk-dim)');
+        return `<tr><td>${esc(n)}</td><td style="text-align:right;color:${kleur}">${v>0?'+':''}€${v}</td></tr>`;
+      }).join('')
+    + `</tbody></table>`;
+}
+
+/* ---------- acties ---------- */
+document.addEventListener('click', async (ev)=>{
+  const t = ev.target.closest('button');
+  if(!t) return;
+
+  // uitdaging plaatsen
+  if(t.dataset.plaats){
+    const mid = Number(t.dataset.plaats);
+    const m = sbWedstrijdVan(mid);
+    const keuze = document.querySelector(`[data-keuzevoor="${mid}"]`).value;
+    const inzet = parseInt(document.querySelector(`[data-inzetvoor="${mid}"]`).value, 10);
+    if(!Number.isInteger(inzet) || inzet < 1 || inzet > 100){
+      toonStatus('sbStatus','fout','Vul een heel bedrag in tussen €1 en €100.'); return;
+    }
+    if(!confirm(`Uitdaging plaatsen: €${inzet} op ${SB_LABEL[keuze]} bij ${m.thuis} — ${m.uit}?`)) return;
+    try{
+      await sbPost({ actie:'plaats', deelnemer:sbSessie, wachtwoord:sbSessieWw, keuze, inzet,
+        wedstrijd:{ id:m.id, thuis:m.thuis, uit:m.uit, aftrap:m.aftrap, speelronde:sbRonde } });
+      const link = sbBunqLink(inzet, `Side Bet ${m.thuis}-${m.uit} ${sbSessie}`);
+      toonStatus('sbStatus','info', link
+        ? `Uitdaging geplaatst — <a href="${link}" target="_blank" rel="noopener" style="color:var(--amber)">betaal hier je €${inzet}</a>. Zodra je betaling bevestigd is, wordt hij zichtbaar voor de anderen.`
+        : 'Uitdaging geplaatst. Zodra je betaling bevestigd is, wordt hij zichtbaar voor de anderen.');
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+
+  // aanhaken
+  if(t.dataset.haak){
+    const id = t.dataset.haak, keuze = t.dataset.keuze;
+    const w = sbData.weddenschappen.find(x=>x.id===id);
+    if(!w) return;
+    if(!confirm(`Aanhaken tegen ${w.uitdager} met ${SB_LABEL[keuze]} voor €${w.inzet}?`)) return;
+    try{
+      await sbPost({ actie:'haak', deelnemer:sbSessie, wachtwoord:sbSessieWw, id, keuze });
+      const link = sbBunqLink(w.inzet, `Side Bet ${w.thuis}-${w.uit} ${sbSessie}`);
+      toonStatus('sbStatus','info', link
+        ? `Je doet mee ✓ — <a href="${link}" target="_blank" rel="noopener" style="color:var(--amber)">betaal hier je €${w.inzet}</a>`
+        : 'Je doet mee ✓');
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+
+  // intrekken
+  if(t.dataset.intrek){
+    if(!confirm('Je uitdaging intrekken?')) return;
+    try{
+      await sbPost({ actie:'intrek', deelnemer:sbSessie, wachtwoord:sbSessieWw, id:t.dataset.intrek });
+      toonStatus('sbStatus','info','Uitdaging ingetrokken ✓');
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+
+  // admin: betaald / uitbetaald
+  if(t.dataset.betaald){
+    try{
+      await sbPost({ actie:'betaald', id:t.dataset.betaald, wie:t.dataset.wie, waarde:t.dataset.waarde==='1' });
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+  if(t.dataset.verwijder){
+    if(!confirm('Deze uitdaging definitief verwijderen?')) return;
+    try{
+      await sbPost({ actie:'verwijder', id:t.dataset.verwijder });
+      toonStatus('sbStatus','info','Uitdaging verwijderd ✓');
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+  if(t.dataset.afgerekend){
+    try{
+      await sbPost({ actie:'afgerekend', id:t.dataset.afgerekend, waarde:t.dataset.waarde==='1' });
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+});
+
+if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
+  const naam = $('sbNaam').value;
+  const team = data.teams[naam];
+  if(team && team.wachtwoord && $('sbWw').value !== team.wachtwoord){
+    toonStatus('sbSessieStatus','fout','Wachtwoord klopt niet.'); return;
+  }
+  sbSessie = naam;
+  sbSessieWw = (team && team.wachtwoord) ? $('sbWw').value : '';
+  $('sbAfmelden').classList.remove('sb-verborgen');
+  $('sbEigenBunq').classList.remove('sb-verborgen');
+  $('sbEigenBunqNaam').value = '';
+  sbHaalUitbetaal();
+  toonStatus('sbSessieStatus','info', `Aangemeld als <strong>${esc(naam)}</strong> ✓`);
+  renderSidebets();
+});
+if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
+  sbSessie = null; sbSessieWw = '';
+  $('sbAfmelden').classList.add('sb-verborgen');
+  $('sbEigenBunq').classList.add('sb-verborgen');
+  verbergStatus('sbSessieStatus');
+  renderSidebets();
+});
+
+if($('sbBewaarEigenBunq')) $('sbBewaarEigenBunq').addEventListener('click', async ()=>{
+  if(!sbSessie){ toonStatus('sbSessieStatus','fout','Meld je eerst aan.'); return; }
+  try{
+    const waarde = $('sbEigenBunqNaam').value.trim();
+    const r = await sbPost({ actie:'betaalnaam', deelnemer:sbSessie, wachtwoord:sbSessieWw, gegevens:waarde });
+    sbUitbetaal[sbSessie] = waarde;
+    if(!waarde) delete sbUitbetaal[sbSessie];
+    $('sbEigenBunqNaam').value = waarde;
+    toonStatus('sbSessieStatus','info','Je bunq.me-naam is opgeslagen \u2713');
+    renderSidebets();
+  }catch(e){ toonStatus('sbSessieStatus','fout', esc(e.message)); }
+});
+
+if($('sbVorige')) $('sbVorige').addEventListener('click', async ()=>{
+  if(sbRonde > 1){ await laadSbWedstrijden(sbRonde - 1); renderSidebets(); }
+});
+if($('sbVolgende')) $('sbVolgende').addEventListener('click', async ()=>{
+  await laadSbWedstrijden(sbRonde + 1); renderSidebets();
+});
+
+if($('sbToggleActief')) $('sbToggleActief').addEventListener('click', async ()=>{
+  try{
+    await sbPost({ actie:'instellingen', actief: !sbData.actief });
+    toonStatus('sbAdminStatus','info', sbData.actief ? 'Side Bets staat open voor deelnemers ✓' : 'Side Bets weer verborgen.');
+    sbToonTab(); renderSidebets();
+  }catch(e){ toonStatus('sbAdminStatus','fout', esc(e.message)); }
+});
+if($('sbBewaarBunq')) $('sbBewaarBunq').addEventListener('click', async ()=>{
+  try{
+    const schoon = sbBunqNaamSchoon($('sbBunqNaam').value);
+    await sbPost({ actie:'instellingen', bunqNaam: schoon });
+    $('sbBunqNaam').value = schoon;
+    toonStatus('sbAdminStatus','info','bunq.me-naam opgeslagen ✓');
+  }catch(e){ toonStatus('sbAdminStatus','fout', esc(e.message)); }
+});
+
+/* Tabzichtbaarheid meeliften op de bestaande render, zonder je code te wijzigen */
+if(typeof renderAlles === 'function'){
+  const _sbOrigRender = renderAlles;
+  renderAlles = function(){
+    _sbOrigRender.apply(this, arguments);
+    sbToonTab();
+    if(isAdmin && !Object.keys(sbUitbetaal).length) sbHaalUitbetaal();
+    renderSidebets();
+  };
+}
+
+/* opstarten */
+(async ()=>{
+  await laadSidebets();
+  await laadSbWedstrijden();
+  renderSidebets();
+  // De poulegegevens komen los binnen; even bijblijven tot de namenlijst gevuld is.
+  let pogingen = 0;
+  const wachtOpNamen = setInterval(()=>{
+    pogingen++;
+    if(alleDeelnemers().length){ renderSidebets(); clearInterval(wachtOpNamen); }
+    else if(pogingen > 40) clearInterval(wachtOpNamen);   // na ~20 sec opgeven
+  }, 500);
+  // elke 2 minuten verversen zodat uitslagen vanzelf binnenkomen
+  setInterval(async ()=>{ await laadSidebets(); await laadSbWedstrijden(sbRonde); renderSidebets(); }, 120000);
 })();
 </script>
 </body>
