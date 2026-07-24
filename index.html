@@ -1562,7 +1562,7 @@ function renderAdminUI(){
   document.querySelectorAll('.tab.adm').forEach(t=>t.classList.toggle('verborgen', !isAdmin));
   $('hofAdminCard').style.display = isAdmin ? 'block' : 'none';
   const b = $('btnAdmin');
-  b.textContent = isAdmin ? '🔓 Admin actief' : '🔒 Admin';
+  b.textContent = isAdmin ? '🔓 Admin — uitloggen' : '🔒 Admin';
   b.classList.toggle('ingelogd', isAdmin);
   if(!isAdmin){
     const open = document.querySelector('section.paneel.actief');
@@ -1570,7 +1570,11 @@ function renderAdminUI(){
   }
 }
 $('btnAdmin').addEventListener('click', ()=>{
-  if(isAdmin){ gaNaarTab('p-instellingen'); return; }
+  if(isAdmin){
+    if(!confirm('Uitloggen als admin?')) return;
+    adminUitloggen();
+    return;
+  }
   verbergStatus('loginStatus');
   $('pinInvoer').value = '';
   $('loginOverlay').classList.add('open');
@@ -1608,7 +1612,21 @@ async function probeerLogin(){
 $('btnLogin').addEventListener('click', probeerLogin);
 $('pinInvoer').addEventListener('keydown', e=>{ if(e.key==='Enter') probeerLogin(); });
 
-$('btnUitloggen').addEventListener('click', ()=>{ isAdmin=false; adminWachtwoord=null; renderAlles(); });
+function adminUitloggen(){
+  isAdmin = false;
+  adminWachtwoord = null;
+  // Side Bets: sessie en opgehaalde uitbetaalgegevens niet laten hangen
+  if(typeof sbUitbetaal !== 'undefined') sbUitbetaal = {};
+  if(typeof sbSessie !== 'undefined'){
+    sbSessie = null; sbSessieWw = '';
+    if($('sbAfmelden')) $('sbAfmelden').classList.add('sb-verborgen');
+    if($('sbEigenBunq')) $('sbEigenBunq').classList.add('sb-verborgen');
+    if($('sbSessieStatus')) verbergStatus('sbSessieStatus');
+  }
+  gaNaarTab('p-standen');
+  renderAlles();
+}
+$('btnUitloggen').addEventListener('click', adminUitloggen);
 
 /* =============== tabs =============== */
 document.querySelectorAll('.tab').forEach(t=>{
