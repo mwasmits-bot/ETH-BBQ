@@ -533,6 +533,12 @@
         <button class="knop primair" id="sbAanmelden">Aanmelden</button>
         <button class="knop sb-verborgen" id="sbAfmelden">Afmelden</button>
       </div>
+      <div id="sbEigenBunq" class="sb-verborgen" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span style="color:var(--chalk-dim);font-size:14px">Uitbetaling <em>(optioneel)</em></span>
+        <input id="sbEigenBunqNaam" placeholder="je bunq.me-naam" style="width:220px">
+        <button class="knop" id="sbBewaarEigenBunq">Opslaan</button>
+        <span style="color:var(--chalk-dim);font-size:12px;flex-basis:100%">Heb je bunq? Vul je bunq.me-naam in, dan gaat uitbetalen met \u00e9\u00e9n klik. Laat je dit leeg, dan betaalt de beheerder je terug op de rekening waarvan je hebt ingelegd. Alleen jij en de beheerder kunnen dit zien.</span>
+      </div>
       <div class="status" id="sbSessieStatus"></div>
     </div>
 
@@ -3015,6 +3021,37 @@ function sbBunqLink(bedrag, omschrijving){
 
 const SB_LABEL = { thuis:'thuis wint', gelijk:'gelijkspel', uit:'uit wint' };
 
+/* Uitbetaalgegevens staan achter een controle; ze zitten niet in de publieke GET. */
+let sbUitbetaal = {};
+async function sbHaalUitbetaal(){
+  if(!isAdmin && !sbSessie) return;
+  try{
+    const j = await sbPost({ actie:'haalbetaalgegevens', deelnemer:sbSessie, wachtwoord:sbSessieWw });
+    sbUitbetaal = j.uitbetaal || {};
+    if(sbSessie && $('sbEigenBunqNaam') && document.activeElement !== $('sbEigenBunqNaam')){
+      $('sbEigenBunqNaam').value = sbUitbetaal[sbSessie] || '';
+    }
+    renderSidebets();
+  }catch(e){ /* stil */ }
+}
+
+/* Herkent zelf wat iemand heeft ingevuld: bunq.me-naam, een link, of een IBAN. */
+function sbUitbetaalWeergave(waarde, bedrag, omschrijving){
+  const v = String(waarde || '').trim();
+  if(!v) return null;
+  const kaal = v.replace(/\s/g,'');
+  if(/^[A-Za-z]{2}\d{2}[A-Za-z0-9]{8,26}$/.test(kaal)){
+    return { soort:'iban', tekst: v.toUpperCase() };
+  }
+  if(/^https?:\/\//i.test(v) || /^(www\.)?[a-z0-9-]+\.[a-z]{2,}\//i.test(v)){
+    const url = /^https?:\/\//i.test(v) ? v : 'https://'+v;
+    const m = url.match(/bunq\.me\/([^\/?#]+)/i);
+    if(m) return { soort:'link', url:`https://bunq.me/${m[1]}/${bedrag}/${encodeURIComponent(omschrijving)}`, bedragErin:true };
+    return { soort:'link', url, bedragErin:false };
+  }
+  return { soort:'link', url:`https://bunq.me/${encodeURIComponent(v)}/${bedrag}/${encodeURIComponent(omschrijving)}`, bedragErin:true };
+}
+
 /* Betaallink voor één weddenschap. Elke bet krijgt een eigen kenmerk (#xxxxx),
    zodat je bij vier losse inzetten ziet welke betaling bij welke bet hoort. */
 function sbBetaalKnop(w, naam){
@@ -3132,6 +3169,35 @@ function renderSidebets(){
       if(!w.betaaldTegenstander) betaal.push(esc(w.tegenstander));
       const betaalTekst = betaal.length
         ? `<span style="color:var(--chalk-dim)"> · nog niet betaald: ${betaal.join(', ')}</span>` : '';
+      // Uitbetaling: alleen de winnaar (en de beheerder) zien deze knop.
+      let uitbetaalRij = '';
+      if(a.status === 'klaar' && !w.afgerekend){
+        const claims = a.terug
+          ? [[w.uitdager, w.inzet], [w.tegenstander, w.inzet]]
+          : [[a.winnaar, w.inzet * 2]];
+        const stukken = claims.map(([wie, bedrag])=>{
+          const kenmerk = String(w.id).slice(-5);
+          const oms = `Uitbetaling Side Bet ${w.thuis}-${w.uit} #${kenmerk}`;
+          const ingevuld = (sbData.heeftUitbetaal || []).includes(wie);
+          const g = sbUitbetaalWeergave(sbUitbetaal[wie], bedrag, oms);
+
+          if(sbSessie === wie){
+            if(!ingevuld) return `<span style="color:var(--chalk-dim);font-size:13px">Je hebt \u20ac${bedrag} tegoed \u2014 de beheerder maakt het terug naar je eigen rekening.</span>`;
+            if(!g) return `<span style="color:var(--chalk-dim);font-size:13px">Je hebt \u20ac${bedrag} tegoed.</span>`;
+            if(g.soort === 'iban') return `<span class="knop" style="color:var(--amber)">\u{1F3C6} Je krijgt \u20ac${bedrag} op ${esc(g.tekst)}</span>`;
+            return `<a class="knop" href="${g.url}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none">\u{1F3C6} Vraag je \u20ac${bedrag} op${g.bedragErin?'':' (bedrag zelf invullen)'}</a>`;
+          }
+
+          if(isAdmin){
+            if(!ingevuld) return `<span style="color:var(--chalk-dim);font-size:13px">\u20ac${bedrag} naar ${esc(wie)} \u2014 terugbetalen via de oorspronkelijke inleg (kenmerk #${kenmerk}).</span>`;
+            if(!g) return '';
+            if(g.soort === 'iban') return `<span class="knop">Maak \u20ac${bedrag} over aan ${esc(wie)}: ${esc(g.tekst)}</span>`;
+            return `<a class="knop" href="${g.url}" target="_blank" rel="noopener" style="text-decoration:none">Betaal \u20ac${bedrag} aan ${esc(wie)}${g.bedragErin?'':' (bedrag zelf invullen)'}</a>`;
+          }
+          return '';
+        }).filter(Boolean);
+        if(stukken.length) uitbetaalRij = `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${stukken.join('')}</div>`;
+      }
       let mijnBetaalKnop = '';
       if(sbSessie === w.uitdager && !w.betaaldUitdager) mijnBetaalKnop = sbBetaalKnop(w, w.uitdager);
       else if(sbSessie === w.tegenstander && !w.betaaldTegenstander) mijnBetaalKnop = sbBetaalKnop(w, w.tegenstander);
@@ -3150,6 +3216,7 @@ function renderSidebets(){
       return `<div style="padding:8px 0;border-top:1px solid var(--line)">
         <strong>${esc(w.uitdager)}</strong> (${SB_LABEL[w.keuzeUitdager]}) vs <strong>${esc(w.tegenstander)}</strong> (${SB_LABEL[w.keuzeTegenstander]}) — €${w.inzet} p.p.
         <div style="margin-top:4px">${uitkomstTekst}${betaalTekst}</div>
+        ${uitbetaalRij}
         ${spelerRij}
         ${adminKnoppen}
       </div>`;
@@ -3297,14 +3364,31 @@ if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
   sbSessie = naam;
   sbSessieWw = (team && team.wachtwoord) ? $('sbWw').value : '';
   $('sbAfmelden').classList.remove('sb-verborgen');
+  $('sbEigenBunq').classList.remove('sb-verborgen');
+  $('sbEigenBunqNaam').value = '';
+  sbHaalUitbetaal();
   toonStatus('sbSessieStatus','info', `Aangemeld als <strong>${esc(naam)}</strong> ✓`);
   renderSidebets();
 });
 if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
   sbSessie = null; sbSessieWw = '';
   $('sbAfmelden').classList.add('sb-verborgen');
+  $('sbEigenBunq').classList.add('sb-verborgen');
   verbergStatus('sbSessieStatus');
   renderSidebets();
+});
+
+if($('sbBewaarEigenBunq')) $('sbBewaarEigenBunq').addEventListener('click', async ()=>{
+  if(!sbSessie){ toonStatus('sbSessieStatus','fout','Meld je eerst aan.'); return; }
+  try{
+    const waarde = $('sbEigenBunqNaam').value.trim();
+    const r = await sbPost({ actie:'betaalnaam', deelnemer:sbSessie, wachtwoord:sbSessieWw, gegevens:waarde });
+    sbUitbetaal[sbSessie] = waarde;
+    if(!waarde) delete sbUitbetaal[sbSessie];
+    $('sbEigenBunqNaam').value = waarde;
+    toonStatus('sbSessieStatus','info','Je bunq.me-naam is opgeslagen \u2713');
+    renderSidebets();
+  }catch(e){ toonStatus('sbSessieStatus','fout', esc(e.message)); }
 });
 
 if($('sbVorige')) $('sbVorige').addEventListener('click', async ()=>{
@@ -3333,7 +3417,12 @@ if($('sbBewaarBunq')) $('sbBewaarBunq').addEventListener('click', async ()=>{
 /* Tabzichtbaarheid meeliften op de bestaande render, zonder je code te wijzigen */
 if(typeof renderAlles === 'function'){
   const _sbOrigRender = renderAlles;
-  renderAlles = function(){ _sbOrigRender.apply(this, arguments); sbToonTab(); };
+  renderAlles = function(){
+    _sbOrigRender.apply(this, arguments);
+    sbToonTab();
+    if(isAdmin && !Object.keys(sbUitbetaal).length) sbHaalUitbetaal();
+    renderSidebets();
+  };
 }
 
 /* opstarten */
