@@ -11,7 +11,7 @@ import { getStore } from "@netlify/blobs";
 const MAX_INZET = 100;
 const KEUZES = ["thuis", "gelijk", "uit"];
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [] });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null } });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -24,7 +24,10 @@ export default async (req) => {
 
   const laad = async () => {
     const s = await store.get("sidebets", { type: "json" });
-    return { ...leegSchema(), ...(s || {}) };
+    const basis = leegSchema();
+    const sb = { ...basis, ...(s || {}) };
+    sb.seizoen = { ...basis.seizoen, ...(sb.seizoen || {}) };
+    return sb;
   };
 
   if (req.method === "GET") {
@@ -47,6 +50,8 @@ export default async (req) => {
   // --- deelnemer identificeren (voor niet-admin acties) ---
   const poule = await store.get("poule", { type: "json" });
   const teams = (poule && poule.teams) || {};
+  const orakelVs = (await store.get("orakel", { type: "json" })) || {};
+  const deedOrakel = (naam) => Object.prototype.hasOwnProperty.call(orakelVs, String(naam || "").trim());
 
   function controleerDeelnemer(naam, wachtwoord) {
     if (isAdmin) return null;                       // admin mag namens iedereen
@@ -90,7 +95,65 @@ export default async (req) => {
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
-    // ================= EIGEN UITBETAALGEGEVENS =================
+    // ============= SEIZOEN — ADMIN =============
+    if (["seizoen-instellingen", "seizoen-betaald", "seizoen-winnaar"].includes(body.actie)) {
+      if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
+
+      if (body.actie === "seizoen-instellingen") {
+        if (typeof body.actief === "boolean") sb.seizoen.actief = body.actief;
+        if (body.inleg !== undefined) {
+          const n = parseInt(body.inleg, 10);
+          if (Number.isInteger(n) && n >= 1 && n <= 1000) sb.seizoen.inleg = n;
+        }
+      }
+
+      if (body.actie === "seizoen-betaald") {
+        const naam = String(body.naam || "").trim();
+        if (!naam) return Response.json({ fout: "Geen naam opgegeven." }, { status: 400 });
+        if (body.waarde) { sb.seizoen.betaald[naam] = true; sb.seizoen.aangemeld[naam] = true; }
+        else { delete sb.seizoen.betaald[naam]; }
+      }
+
+      if (body.actie === "seizoen-winnaar") {
+        const naam = body.naam ? String(body.naam).trim() : null;
+        if (naam && !sb.seizoen.betaald[naam]) {
+          return Response.json({ fout: "Alleen een deelnemer die de inleg heeft betaald kan winnen." }, { status: 400 });
+        }
+        sb.seizoen.winnaar = naam;
+      }
+
+      await bewaar();
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
+    // ============= SEIZOEN — DEELNEMER =============
+    if (body.actie === "seizoen-doemee") {
+      const { deelnemer, wachtwoord } = body;
+      const fout = controleerDeelnemer(deelnemer, wachtwoord);
+      if (fout) return Response.json({ fout }, { status: 401 });
+      if (!sb.seizoen.actief && !isAdmin) {
+        return Response.json({ fout: "De seizoens-sidebet staat nog niet open." }, { status: 403 });
+      }
+      if (!deedOrakel(deelnemer)) {
+        return Response.json({ fout: "Je kunt pas meedoen als je een Eredivisie Orakel-voorspelling hebt ingediend." }, { status: 403 });
+      }
+      sb.seizoen.aangemeld[String(deelnemer).trim()] = true;
+      await bewaar();
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
+    if (body.actie === "seizoen-afmelden") {
+      const { deelnemer, wachtwoord } = body;
+      const fout = controleerDeelnemer(deelnemer, wachtwoord);
+      if (fout) return Response.json({ fout }, { status: 401 });
+      const naam = String(deelnemer || "").trim();
+      if (sb.seizoen.betaald[naam] && !isAdmin) {
+        return Response.json({ fout: "Je inleg is al bevestigd — vraag de beheerder om je af te melden." }, { status: 400 });
+      }
+      delete sb.seizoen.aangemeld[naam];
+      await bewaar();
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
     // Vrij veld: bunq.me-naam, een betaalverzoek-link (Tikkie/ING/Rabo) of IBAN.
     if (body.actie === "betaalnaam") {
       const { deelnemer, wachtwoord } = body;

@@ -95,27 +95,39 @@ export default async (req) => {
 
   let body;
   try { body = await req.json(); } catch { body = null; }
-  const { ontvangers, onderwerp, tekst, modus } = body || {};
+  const { ontvangers, onderwerp, tekst, modus, naarAdmin } = body || {};
 
-  if (!Array.isArray(ontvangers) || !ontvangers.length || !onderwerp || !tekst) {
-    return Response.json({ fout: "Onvolledige mail (ontvangers, onderwerp of tekst ontbreekt)." }, { status: 400 });
+  if (!onderwerp || !tekst) {
+    return Response.json({ fout: "Onvolledige mail (onderwerp of tekst ontbreekt)." }, { status: 400 });
   }
 
-  // --- alleen naar bekende deelnemers mailen ---
-  const store = getStore("eth-scorito-bbq");
-  const hoofd = await store.get("poule", { type: "json" });
-  const teams = (hoofd && hoofd.teams) || {};
-  const bekend = new Set(
-    Object.values(teams)
-      .map(t => (t && t.email ? String(t.email).trim().toLowerCase() : ""))
-      .filter(Boolean)
-  );
-  const geldig = ontvangers
-    .map(e => String(e).trim())
-    .filter(e => bekend.has(e.toLowerCase()));
+  let geldig;
+  let naarBcc;
+  if (naarAdmin) {
+    // Afrekening/overzicht naar de beheerder zelf — geen deelnemerscontrole nodig.
+    geldig = [antwoordAdres || afzenderAdres];
+    naarBcc = false;
+  } else {
+    if (!Array.isArray(ontvangers) || !ontvangers.length) {
+      return Response.json({ fout: "Geen ontvangers opgegeven." }, { status: 400 });
+    }
+    // --- alleen naar bekende deelnemers mailen ---
+    const store = getStore("eth-scorito-bbq");
+    const hoofd = await store.get("poule", { type: "json" });
+    const teams = (hoofd && hoofd.teams) || {};
+    const bekend = new Set(
+      Object.values(teams)
+        .map(t => (t && t.email ? String(t.email).trim().toLowerCase() : ""))
+        .filter(Boolean)
+    );
+    geldig = ontvangers
+      .map(e => String(e).trim())
+      .filter(e => bekend.has(e.toLowerCase()));
 
-  if (!geldig.length) {
-    return Response.json({ fout: "Geen van de ontvangers staat als deelnemer in de poule." }, { status: 400 });
+    if (!geldig.length) {
+      return Response.json({ fout: "Geen van de ontvangers staat als deelnemer in de poule." }, { status: 400 });
+    }
+    naarBcc = modus !== "to" && geldig.length > 1;
   }
 
   // --- versturen ---
@@ -127,7 +139,6 @@ export default async (req) => {
       auth: { user: "resend", pass: apiKey }
     });
 
-    const naarBcc = modus !== "to" && geldig.length > 1;
     await transport.sendMail({
       from: afzender,
       to: naarBcc ? antwoordAdres : geldig.join(", "),
@@ -138,7 +149,7 @@ export default async (req) => {
       html: bouwHtml({ tekst, logoUrl, afzenderNaam })   // opgemaakte versie
     });
 
-    return Response.json({ ok: true, aantal: geldig.length, afzender: afzenderAdres });
+    return Response.json({ ok: true, aantal: geldig.length, afzender: naarAdmin ? geldig[0] : afzenderAdres });
   } catch (e) {
     const melding = String(e && e.message || e);
     let vriendelijk = melding;
