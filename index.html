@@ -243,6 +243,21 @@
   .dp-knoppen button.aan.ja{background:#2EA05A;color:#fff;border-color:#2EA05A}
   .dp-knoppen button.aan.nee{background:var(--red);color:#fff;border-color:var(--red)}
   .dp-knoppen button.aan.misschien{background:var(--amber);color:#20170a;border-color:var(--amber)}
+  .sb-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;letter-spacing:.02em;line-height:1.35;white-space:nowrap}
+  .sb-badge.concept{background:var(--line);color:var(--chalk-dim)}
+  .sb-badge.open{background:var(--amber-soft);color:var(--amber);border:1px solid rgba(255,179,0,.45)}
+  .sb-badge.actief{background:rgba(96,165,250,.16);color:#93c5fd;border:1px solid rgba(96,165,250,.45)}
+  .sb-badge.live{background:var(--red-soft);color:#fca5a5;border:1px solid rgba(224,85,72,.5)}
+  .sb-badge.gewonnen{background:rgba(132,204,22,.18);color:#a3e635;border:1px solid rgba(132,204,22,.5)}
+  .sb-badge.terug{background:var(--line);color:var(--chalk-dim);border:1px solid var(--line)}
+  .sb-winnaar{color:#a3e635;font-weight:800}
+  .sb-verliezer{color:var(--chalk-dim);text-decoration:line-through;opacity:.7}
+  .sb-pot{background:linear-gradient(135deg,var(--amber-soft),transparent);border:1px solid rgba(255,179,0,.4);border-radius:var(--radius);padding:18px;text-align:center}
+  .sb-pot-label{font-size:13px;color:var(--chalk-dim);text-transform:uppercase;letter-spacing:.05em}
+  .sb-pot-bedrag{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:44px;color:var(--amber);line-height:1.05;margin:4px 0}
+  .sb-pot-sub{font-size:13px;color:var(--chalk-dim)}
+  .sb-adminlijst{display:grid;gap:6px}
+  .sb-adminrij{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 10px;background:var(--pitch-deep);border:1px solid var(--line);border-radius:8px}
 </style>
 </head>
 <body>
@@ -521,6 +536,10 @@
         <button class="knop" id="sbBewaarBunq">Opslaan</button>
       </div>
       <p class="uitleg" style="margin-bottom:0">De bunq.me-naam is het stukje achter bunq.me/ in je eigen betaallink. Vul je die in, dan krijgt elke speler een kant-en-klaar betaalverzoek te zien.</p>
+      <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+        <button class="knop primair" id="sbAfrekenMail">📧 Mail mij de weekend-afrekening</button>
+        <p class="uitleg" style="margin:8px 0 0">Overzicht van alle afgeronde bets, met per winnaar één netto bedrag — geen losse tikkies meer. De mail gaat naar je eigen mailbox.</p>
+      </div>
       <div class="status" id="sbAdminStatus"></div>
     </div>
 
@@ -542,8 +561,16 @@
       <div class="status" id="sbSessieStatus"></div>
     </div>
 
+    <!-- sub-navigatie Side Bets -->
+    <div class="card" style="padding:10px 12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="knop primair" id="sbNavRonde">📅 Per speelronde</button>
+        <button class="knop" id="sbNavSeizoen">🏆 Seizoen</button>
+      </div>
+    </div>
+
     <!-- wedstrijden -->
-    <div class="card">
+    <div class="card sb-ronde-view">
       <h2>Wedstrijden</h2>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
         <button class="knop" id="sbVorige">‹ vorige</button>
@@ -555,9 +582,19 @@
     </div>
 
     <!-- saldo -->
-    <div class="card">
+    <div class="card sb-ronde-view">
       <h2>Tussenstand in euro's</h2>
       <div id="sbSaldo"></div>
+    </div>
+
+    <!-- seizoens-sidebet -->
+    <div id="sbViewSeizoen" style="display:none">
+      <div class="card">
+        <h2>🏆 Seizoens-sidebet — Eredivisie Orakel</h2>
+        <p class="uitleg">Eén grote seizoensweddenschap: leg €20 in en strijd om de hele pot. Meedoen kan zodra je het Eredivisie Orakel hebt ingevuld; alleen wie de inleg betaalt maakt kans op de prijs. De winnaar is de beste Orakel-voorspeller aan het eind van het seizoen — winner takes all.</p>
+        <div id="sbSeizoenInhoud"></div>
+      </div>
+      <div class="card" id="sbSeizoenAdmin" style="display:none"></div>
     </div>
 
   </section>
@@ -3105,6 +3142,31 @@ function sbTijd(iso){
   }catch(e){ return iso; }
 }
 
+/* Statusbadge + uitslagtekst voor een weddenschap. */
+function sbUitslagTekst(m){
+  if(!m || m.status !== 'FINISHED') return '';
+  const t = m.thuisDoelpunten, u = m.uitDoelpunten;
+  if(m.uitkomst === 'thuis') return `${esc(m.thuis)} won ${t}–${u}`;
+  if(m.uitkomst === 'uit')   return `${esc(m.uit)} won ${u}–${t}`;
+  return `Gelijkspel ${t}–${u}`;
+}
+function sbBadge(w){
+  const a = sbAfloop(w);
+  const m = sbWedstrijdVan(w.matchId);
+  if(a.status === 'open'){
+    return w.betaaldUitdager
+      ? '<span class="sb-badge open">⏳ Open — zoekt tegenstander</span>'
+      : '<span class="sb-badge concept">◌ Concept — inzet niet bevestigd</span>';
+  }
+  if(a.status === 'wacht'){
+    return (m && (m.status === 'IN_PLAY' || m.status === 'PAUSED'))
+      ? '<span class="sb-badge live">🔴 Live — wedstrijd bezig</span>'
+      : '<span class="sb-badge actief">🔵 Vastgezet — nog te spelen</span>';
+  }
+  if(a.terug) return '<span class="sb-badge terug">↩︎ Niemand goed — inzet terug</span>';
+  return `<span class="sb-badge gewonnen">✅ ${esc(a.winnaar)} wint €${w.inzet * 2}</span>`;
+}
+
 function renderSidebets(){
   if(!$('sbWedstrijden')) return;
 
@@ -3170,7 +3232,10 @@ function renderSidebets(){
         ? `<button class="knop" data-betaald="${w.id}" data-wie="uitdager" data-waarde="${w.betaaldUitdager?0:1}">${w.betaaldUitdager?'✓':'○'} betaling ontvangen</button>
            <button class="knop" data-verwijder="${w.id}">Verwijderen</button>` : '';
       return `<div style="padding:8px 0;border-top:1px solid var(--line)">
-        <strong>${esc(w.uitdager)}</strong> zet <strong>€${w.inzet}</strong> op <strong>${SB_LABEL[w.keuzeUitdager]}</strong>
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
+          <span><strong>${esc(w.uitdager)}</strong> zet <strong>€${w.inzet}</strong> op <strong>${SB_LABEL[w.keuzeUitdager]}</strong></span>
+          ${sbBadge(w)}
+        </div>
         ${staat}
         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">${betaalKnop}${knoppen}${intrek}${adminOpen}</div>
       </div>`;
@@ -3179,9 +3244,20 @@ function renderSidebets(){
     // lopende / afgeronde weddenschappen
     const matchHtml = gematcht.map(w => {
       const a = sbAfloop(w);
-      let uitkomstTekst = '<span style="color:var(--chalk-dim)">nog niet gespeeld</span>';
-      if(a.status === 'klaar' && a.terug) uitkomstTekst = '<span style="color:var(--chalk-dim)">niemand goed — inzet terug</span>';
-      else if(a.status === 'klaar') uitkomstTekst = `<strong style="color:var(--amber)">${esc(a.winnaar)} wint €${w.inzet * 2}</strong>`;
+      const mWed = sbWedstrijdVan(w.matchId);
+      const sbBadgeHtml = sbBadge(w);
+      const sbUitslag = sbUitslagTekst(mWed);
+      let uitdaLbl = `<strong>${esc(w.uitdager)}</strong> (${SB_LABEL[w.keuzeUitdager]})`;
+      let tegenLbl = `<strong>${esc(w.tegenstander)}</strong> (${SB_LABEL[w.keuzeTegenstander]})`;
+      if(a.status === 'klaar' && !a.terug){
+        const uWint = a.winnaar === w.uitdager;
+        uitdaLbl = uWint
+          ? `<span class="sb-winnaar">🏆 ${esc(w.uitdager)}</span> (${SB_LABEL[w.keuzeUitdager]})`
+          : `<span class="sb-verliezer">${esc(w.uitdager)} (${SB_LABEL[w.keuzeUitdager]})</span>`;
+        tegenLbl = !uWint
+          ? `<span class="sb-winnaar">🏆 ${esc(w.tegenstander)}</span> (${SB_LABEL[w.keuzeTegenstander]})`
+          : `<span class="sb-verliezer">${esc(w.tegenstander)} (${SB_LABEL[w.keuzeTegenstander]})</span>`;
+      }
       const betaal = [];
       if(!w.betaaldUitdager) betaal.push(esc(w.uitdager));
       if(!w.betaaldTegenstander) betaal.push(esc(w.tegenstander));
@@ -3232,8 +3308,11 @@ function renderSidebets(){
              <button class="knop" data-verwijder="${w.id}">Verwijderen</button>
            </div>` : '';
       return `<div style="padding:8px 0;border-top:1px solid var(--line)">
-        <strong>${esc(w.uitdager)}</strong> (${SB_LABEL[w.keuzeUitdager]}) vs <strong>${esc(w.tegenstander)}</strong> (${SB_LABEL[w.keuzeTegenstander]}) — €${w.inzet} p.p.
-        <div style="margin-top:4px">${uitkomstTekst}${betaalTekst}</div>
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
+          <span>${uitdaLbl} <span style="color:var(--chalk-dim)">vs</span> ${tegenLbl} — €${w.inzet} p.p.</span>
+          ${sbBadgeHtml}
+        </div>
+        ${sbUitslag ? `<div style="margin-top:4px;color:var(--chalk-dim);font-size:13px">Uitslag: ${sbUitslag}${betaalTekst}</div>` : `<div style="margin-top:4px">${betaalTekst}</div>`}
         ${uitbetaalRij}
         ${spelerRij}
         ${adminKnoppen}
@@ -3265,6 +3344,8 @@ function renderSidebets(){
   $('sbWedstrijden').innerHTML = rows || '<p class="uitleg">Geen wedstrijden gevonden voor deze speelronde.</p>';
 
   renderSbSaldo();
+  renderSbSeizoen();
+  sbToonView();
 }
 
 function renderSbSaldo(){
@@ -3291,6 +3372,286 @@ function renderSbSaldo(){
       }).join('')
     + `</tbody></table>`;
 }
+
+/* ---------- weekend-afrekening (admin) ---------- */
+function sbAfrekening(){
+  const uitbetalen = {}, teruggeven = {}, teInnen = {}, bets = [];
+  sbData.weddenschappen.forEach(w=>{
+    if(!w.tegenstander) return;
+    const a = sbAfloop(w);
+    if(a.status !== 'klaar') return;
+    bets.push({ w, a });
+    if(!w.betaaldUitdager)     teInnen[w.uitdager]     = (teInnen[w.uitdager]     || 0) + w.inzet;
+    if(!w.betaaldTegenstander) teInnen[w.tegenstander] = (teInnen[w.tegenstander] || 0) + w.inzet;
+    if(w.afgerekend) return;
+    if(a.terug){
+      [w.uitdager, w.tegenstander].forEach(n=>{
+        teruggeven[n] = teruggeven[n] || { totaal:0 };
+        teruggeven[n].totaal += w.inzet;
+      });
+    } else {
+      uitbetalen[a.winnaar] = uitbetalen[a.winnaar] || { totaal:0, bets:[] };
+      uitbetalen[a.winnaar].totaal += w.inzet * 2;
+      uitbetalen[a.winnaar].bets.push(w);
+    }
+  });
+  return { uitbetalen, teruggeven, teInnen, bets };
+}
+function sbAfrekeningTekst(){
+  const { uitbetalen, teruggeven, teInnen, bets } = sbAfrekening();
+  if(!bets.length) return null;
+  const eu = n => '€' + n;
+  const ronde = sbRonde ? ('speelronde ' + sbRonde) : 'dit weekend';
+  const R = [];
+  R.push('Weekend-afrekening Side Bets — ' + ronde);
+  R.push('Peildatum: ' + new Date().toLocaleString('nl-NL', { weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' }));
+  R.push('');
+
+  const winnaars = Object.keys(uitbetalen).sort((a,b)=> uitbetalen[b].totaal - uitbetalen[a].totaal);
+  if(winnaars.length){
+    R.push('▼ UITBETALEN AAN WINNAARS (netto — één bedrag per persoon)');
+    let som = 0;
+    winnaars.forEach(n=>{
+      const info = sbUitbetaal[n] ? ' — ' + sbUitbetaal[n] : ' — (geen uitbetaalinfo; terug op inleg-rekening)';
+      R.push('• ' + n + ': ' + eu(uitbetalen[n].totaal) + info);
+      uitbetalen[n].bets.forEach(w=>{
+        const verl = (sbAfloop(w).winnaar === w.uitdager) ? w.tegenstander : w.uitdager;
+        R.push('    - ' + w.thuis + '–' + w.uit + ': wint van ' + verl + ' (' + eu(w.inzet * 2) + ')');
+      });
+      som += uitbetalen[n].totaal;
+    });
+    R.push('  Totaal uit te betalen: ' + eu(som));
+    R.push('');
+  }
+
+  const terug = Object.keys(teruggeven).sort();
+  if(terug.length){
+    R.push('▼ INZET TERUG (niemand had gelijk)');
+    terug.forEach(n=> R.push('• ' + n + ': ' + eu(teruggeven[n].totaal) + ' terug'));
+    R.push('');
+  }
+
+  const innen = Object.keys(teInnen).sort();
+  if(innen.length){
+    R.push('▼ NOG TE INNEN (inzet nog niet als betaald gemarkeerd)');
+    innen.forEach(n=> R.push('• ' + n + ': ' + eu(teInnen[n])));
+    R.push('');
+  }
+
+  R.push('▼ ALLE AFGERONDE BETS');
+  bets.forEach(({ w, a }, i)=>{
+    const m = sbWedstrijdVan(w.matchId);
+    const uit = (m && m.status === 'FINISHED') ? ' (' + m.thuisDoelpunten + '–' + m.uitDoelpunten + ')' : '';
+    const res = a.terug ? 'niemand goed — inzet terug' : (a.winnaar + ' wint ' + eu(w.inzet * 2));
+    R.push((i+1) + '. ' + w.thuis + '–' + w.uit + uit + ': '
+      + w.uitdager + ' (' + SB_LABEL[w.keuzeUitdager] + ') vs '
+      + w.tegenstander + ' (' + SB_LABEL[w.keuzeTegenstander] + ') → ' + res);
+  });
+  return R.join('\n');
+}
+if($('sbAfrekenMail')) $('sbAfrekenMail').addEventListener('click', async ()=>{
+  if(!isAdmin || !adminWachtwoord){ toonStatus('sbAdminStatus','fout','Log eerst in als admin.'); return; }
+  await sbHaalUitbetaal();
+  const tekst = sbAfrekeningTekst();
+  if(!tekst){ toonStatus('sbAdminStatus','fout','Nog geen afgeronde weddenschappen om af te rekenen.'); return; }
+  const knop = $('sbAfrekenMail'); const orig = knop.textContent;
+  knop.disabled = true; knop.textContent = '⏳ Versturen…';
+  toonStatus('sbAdminStatus','info','Afrekening versturen naar je eigen mailbox…');
+  try{
+    const r = await fetch(API_MAIL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-wachtwoord':adminWachtwoord },
+      body: JSON.stringify({ naarAdmin:true, onderwerp:('Side Bets afrekening — ' + (sbRonde ? ('ronde ' + sbRonde) : 'weekend')), tekst })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.fout || ('serverfout ' + r.status));
+    toonStatus('sbAdminStatus','info', '✅ Afrekening gemaild naar ' + esc(j.afzender || 'je mailbox') + '.');
+  }catch(e){
+    toonStatus('sbAdminStatus','fout','Versturen mislukt: ' + esc(e.message));
+  }finally{ knop.disabled = false; knop.textContent = orig; }
+});
+
+/* =============== seizoens-sidebet (Eredivisie Orakel-inleg) =============== */
+let sbView = 'ronde';
+function sbToonView(){
+  document.querySelectorAll('.sb-ronde-view').forEach(el=> el.style.display = (sbView==='ronde') ? '' : 'none');
+  const sv = $('sbViewSeizoen'); if(sv) sv.style.display = (sbView==='seizoen') ? '' : 'none';
+  if($('sbNavRonde'))   $('sbNavRonde').classList.toggle('primair', sbView==='ronde');
+  if($('sbNavSeizoen')) $('sbNavSeizoen').classList.toggle('primair', sbView==='seizoen');
+}
+if($('sbNavRonde'))   $('sbNavRonde').addEventListener('click', ()=>{ sbView='ronde'; sbToonView(); });
+if($('sbNavSeizoen')) $('sbNavSeizoen').addEventListener('click', ()=>{ sbView='seizoen'; sbToonView(); });
+
+function sbSeizoen(){ return sbData.seizoen || { actief:false, inleg:20, aangemeld:{}, betaald:{}, winnaar:null }; }
+function sbOrakelNamen(){
+  if(!orakelInfo) return [];
+  if(orakelInfo.namen && orakelInfo.namen.length) return orakelInfo.namen.slice();
+  return Object.keys(orakelInfo.voorspellingen || {});
+}
+/* Ranglijst onder de Orakel-deelnemers (alleen als gepubliceerd + live stand). */
+function sbSeizoenStand(){
+  if(!orakelInfo || !orakelInfo.gepubliceerd || !liveStand) return null;
+  const vs = orakelInfo.voorspellingen || {};
+  const betaald = sbSeizoen().betaald || {};
+  return Object.keys(vs)
+    .map(naam => ({ naam, totaal: orakelScore(vs[naam]).totaal, betaald: !!betaald[naam] }))
+    .sort((a,b)=> b.totaal - a.totaal || a.naam.localeCompare(b.naam,'nl'));
+}
+
+function renderSbSeizoen(){
+  const houder = $('sbSeizoenInhoud');
+  if(!houder) return;
+  const s = sbSeizoen();
+  const inleg = s.inleg || 20;
+  const orakelNamen = sbOrakelNamen();
+  const betaaldNamen = Object.keys(s.betaald || {}).filter(n=> s.betaald[n]);
+  const aangemeld = Object.keys(s.aangemeld || {}).filter(n=> s.aangemeld[n]);
+  const pot = inleg * betaaldNamen.length;
+  const stand = sbSeizoenStand();
+
+  renderSbSeizoenAdmin();
+
+  if(!s.actief && !isAdmin){
+    houder.innerHTML = '<div class="leeg">De seizoens-sidebet is nog niet geopend door de beheerder.</div>';
+    return;
+  }
+
+  let html = `<div class="sb-pot">
+    <div class="sb-pot-label">De pot — Orakel-inleg €${inleg} p.p.</div>
+    <div class="sb-pot-bedrag">€${pot}</div>
+    <div class="sb-pot-sub">${betaaldNamen.length} in de running · winner takes all</div>
+  </div>`;
+
+  if(s.winnaar){
+    html += `<div class="card" style="border-left:3px solid #a3e635;margin-top:12px">
+      <strong style="color:#a3e635">🏆 ${esc(s.winnaar)} wint de pot van €${pot}!</strong></div>`;
+  }
+
+  // eigen status / meedoen
+  if(sbSessie){
+    const deedOrakel = orakelNamen.includes(sbSessie);
+    const isBetaald  = !!(s.betaald || {})[sbSessie];
+    const isAangemeld = aangemeld.includes(sbSessie);
+    if(!deedOrakel){
+      html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">Je kunt meedoen zodra je een <strong>Eredivisie Orakel</strong>-voorspelling hebt ingediend. Vul eerst het Orakel in, kom daarna hier terug.</p></div>`;
+    } else if(isBetaald){
+      html += `<div class="card" style="margin-top:12px"><strong style="color:#a3e635">✅ Je doet mee — inleg van €${inleg} bevestigd. Succes!</strong></div>`;
+    } else if(isAangemeld){
+      const link = sbBunqLink(inleg, `Orakel inleg ${sbSessie}`);
+      const knop = link ? `<a class="knop" href="${link}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none">💶 Betaal €${inleg} inleg</a>` : '';
+      html += `<div class="card" style="margin-top:12px">
+        <strong>Je bent aangemeld.</strong> Maak je inleg over; zodra de beheerder die bevestigt, sta je in de running.
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">${knop}<button class="knop" data-seizoen-afmelden="1">Afmelden</button></div>
+      </div>`;
+    } else if(s.actief){
+      html += `<div class="card" style="margin-top:12px">
+        <strong>Doe mee aan de seizoens-sidebet</strong> — €${inleg} inleg, winnaar krijgt de hele pot.
+        <div style="margin-top:8px"><button class="knop primair" data-seizoen-doemee="1">Doe mee (€${inleg})</button></div>
+      </div>`;
+    }
+  } else {
+    html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">Meld je aan onder “Wie ben je?” om mee te doen.</p></div>`;
+  }
+
+  // in de running
+  html += `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">In de running (${betaaldNamen.length})</h3>`;
+  if(stand){
+    const inRun = stand.filter(r=> r.betaald);
+    html += inRun.length
+      ? `<table class="stand"><tr><th></th><th>Deelnemer</th><th style="text-align:right">Orakel-punten</th></tr>`
+        + inRun.map((r,i)=>`<tr class="${i===0?'p1':''}"><td class="pos">${i+1}</td><td>${esc(r.naam)}${s.winnaar===r.naam?' 🏆':(i===0?' 👑':'')}</td><td class="num">${r.totaal}</td></tr>`).join('')
+        + `</table>`
+      : '<div class="leeg">Nog niemand heeft de inleg betaald.</div>';
+  } else {
+    html += betaaldNamen.length
+      ? `<div>${betaaldNamen.map(esc).join(', ')}</div>`
+      : '<div class="leeg">Nog niemand heeft de inleg betaald.</div>';
+    html += `<p class="uitleg" style="margin:8px 0 0">De ranglijst verschijnt zodra het Orakel is gepubliceerd (na start van de eerste speelronde).</p>`;
+  }
+  html += `</div>`;
+
+  // kan nog meedoen
+  const nogNiet = orakelNamen.filter(n=> !betaaldNamen.includes(n) && !aangemeld.includes(n));
+  if(nogNiet.length){
+    html += `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Kan nog meedoen</h3>
+      <p class="uitleg" style="margin:0">Deed het Orakel maar nog geen inleg: ${nogNiet.map(esc).join(', ')}</p></div>`;
+  }
+
+  houder.innerHTML = html;
+}
+
+function renderSbSeizoenAdmin(){
+  const el = $('sbSeizoenAdmin');
+  if(!el) return;
+  if(!isAdmin){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  const s = sbSeizoen();
+  const inleg = s.inleg || 20;
+  const orakelNamen = sbOrakelNamen();
+  const stand = sbSeizoenStand();
+  const koploper = stand ? (stand.find(r=> r.betaald) || {}).naam : null;
+  const rijen = orakelNamen.length
+    ? orakelNamen.map(n=>{
+        const paid = !!(s.betaald || {})[n];
+        const aang = !!(s.aangemeld || {})[n];
+        const merk = paid ? '' : (aang ? ' <span style="color:var(--chalk-dim);font-size:12px">(aangemeld)</span>' : '');
+        return `<div class="sb-adminrij"><span>${esc(n)}${merk}</span>
+          <button class="knop" data-seizoen-betaald="${esc(n)}" data-waarde="${paid?0:1}">${paid?'✓ inleg betaald':'○ nog niet'}</button></div>`;
+      }).join('')
+    : '<div class="leeg">Nog niemand heeft het Orakel ingevuld.</div>';
+  const winOpties = Object.keys(s.betaald || {}).filter(n=> s.betaald[n]);
+  el.innerHTML = `
+    <h2>Seizoens-sidebet — beheer</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <button class="knop" data-seizoen-toggle="1">${s.actief?'🔓 Open — klik om te sluiten':'🔒 Gesloten — klik om te openen'}</button>
+      <label style="display:flex;align-items:center;gap:6px;color:var(--chalk-dim);font-size:14px">inleg €<input id="sbSeizoenInleg" type="number" min="1" value="${inleg}" style="width:70px"></label>
+      <button class="knop" data-seizoen-inleg="1">Opslaan</button>
+    </div>
+    <p class="uitleg">Vink af wie de €${inleg} inleg heeft betaald. Alleen betaalde deelnemers doen mee om de pot.</p>
+    <div class="sb-adminlijst">${rijen}</div>
+    <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <span style="color:var(--chalk-dim);font-size:14px">Winnaar:</span>
+      <select id="sbSeizoenWinnaar" style="min-width:160px">
+        <option value="">— nog niet bepaald —</option>
+        ${winOpties.map(n=>`<option ${s.winnaar===n?'selected':''}>${esc(n)}</option>`).join('')}
+      </select>
+      <button class="knop primair" data-seizoen-winnaar="1">Vastleggen</button>
+      ${koploper ? `<span style="color:var(--chalk-dim);font-size:13px">Koploper (betaald): <strong>${esc(koploper)}</strong></span>` : ''}
+    </div>
+    <div class="status" id="sbSeizoenStatus"></div>`;
+}
+
+function sbSeizoenMelding(soort, msg){
+  const id = $('sbSeizoenStatus') ? 'sbSeizoenStatus' : 'sbSessieStatus';
+  toonStatus(id, soort, msg);
+}
+async function sbSeizoenActie(payload, okMsg){
+  try{
+    await sbPost(payload);
+    renderSidebets();
+    if(okMsg) sbSeizoenMelding('info', okMsg);
+  }catch(e){ sbSeizoenMelding('fout', e.message); }
+}
+document.addEventListener('click', (ev)=>{
+  const t = ev.target.closest('button');
+  if(!t) return;
+  if(t.dataset.seizoenDoemee){
+    if(!sbSessie){ toonStatus('sbSessieStatus','fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
+    sbSeizoenActie({ actie:'seizoen-doemee', deelnemer:sbSessie, wachtwoord:sbSessieWw }, 'Aangemeld — maak je inleg over.');
+  } else if(t.dataset.seizoenAfmelden){
+    sbSeizoenActie({ actie:'seizoen-afmelden', deelnemer:sbSessie, wachtwoord:sbSessieWw }, 'Afgemeld.');
+  } else if(t.dataset.seizoenToggle){
+    sbSeizoenActie({ actie:'seizoen-instellingen', actief: !sbSeizoen().actief }, 'Opgeslagen.');
+  } else if(t.dataset.seizoenInleg){
+    const v = parseInt($('sbSeizoenInleg').value, 10) || 20;
+    sbSeizoenActie({ actie:'seizoen-instellingen', inleg: v }, 'Inleg opgeslagen.');
+  } else if(t.dataset.seizoenBetaald){
+    sbSeizoenActie({ actie:'seizoen-betaald', naam:t.dataset.seizoenBetaald, waarde: t.dataset.waarde==='1' }, 'Bijgewerkt.');
+  } else if(t.dataset.seizoenWinnaar){
+    const n = $('sbSeizoenWinnaar').value;
+    sbSeizoenActie({ actie:'seizoen-winnaar', naam: n || null }, n ? ('Winnaar vastgelegd: '+n) : 'Winnaar gewist.');
+  }
+});
 
 /* ---------- acties ---------- */
 document.addEventListener('click', async (ev)=>{
