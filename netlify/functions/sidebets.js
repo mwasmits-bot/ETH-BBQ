@@ -51,7 +51,8 @@ export default async (req) => {
   const poule = await store.get("poule", { type: "json" });
   const teams = (poule && poule.teams) || {};
   const orakelVs = (await store.get("orakel", { type: "json" })) || {};
-  const deedOrakel = (naam) => Object.prototype.hasOwnProperty.call(orakelVs, String(naam || "").trim());
+  const orakelNamenLc = new Set(Object.keys(orakelVs).map(k => String(k).trim().toLowerCase()));
+  const deedOrakel = (naam) => orakelNamenLc.has(String(naam || "").trim().toLowerCase());
 
   function controleerDeelnemer(naam, wachtwoord) {
     if (isAdmin) return null;                       // admin mag namens iedereen
