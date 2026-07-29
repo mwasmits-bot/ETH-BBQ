@@ -839,6 +839,9 @@
     <h2>🔒 Admin-login</h2>
     <p>Voer het wachtwoord in om rondes toe te voegen of te bewerken.</p>
     <input type="password" id="pinInvoer" placeholder="Wachtwoord" autocomplete="current-password">
+    <label style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;font-size:14px;color:var(--chalk-dim);cursor:pointer">
+      <input type="checkbox" id="onthoudAdmin" checked style="width:16px;height:16px;accent-color:var(--amber)"> Ingelogd blijven op dit apparaat (30 dagen)
+    </label>
     <div class="knoppenrij">
       <button class="actie" id="btnLogin">Inloggen</button>
       <button class="actie stil" id="btnLoginSluit">Sluiten</button>
@@ -863,6 +866,44 @@ let data = { rounds: {}, teams: {}, spelerpunten: {} };
    spelerpunten:{ "3": { spelernaam: punten } }  — één gedeelde lijst per ronde */
 let isAdmin = false;
 let adminWachtwoord = null;
+
+/* ===== Ingelogd blijven op dit apparaat (per snelkoppeling gescheiden via de URL) ===== */
+const ETH_ADMIN_APP = /admin/i.test(location.search + location.hash);
+const ETH_ADMIN_DAGEN = 30;
+function ethB64(s){ try{ return btoa(unescape(encodeURIComponent(String(s)))); }catch(e){ return ''; } }
+function ethDeB64(s){ try{ return decodeURIComponent(escape(atob(String(s)))); }catch(e){ return ''; } }
+function ethBewaar(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function ethLees(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function ethWis(...ks){ try{ ks.forEach(k=> localStorage.removeItem(k)); }catch(e){} }
+
+async function ethHerstelAdmin(){
+  const pinB = ethLees('eth_admin_pin');
+  const exp = parseInt(ethLees('eth_admin_exp') || '0', 10);
+  if(!pinB) return;
+  if(exp && Date.now() > exp){ ethWis('eth_admin_pin','eth_admin_exp'); return; }
+  const pin = ethDeB64(pinB);
+  if(!pin) return;
+  try{
+    const resp = await fetch('/.netlify/functions/verify', { method:'POST', headers:{ 'x-wachtwoord': pin } });
+    if(!resp.ok){ ethWis('eth_admin_pin','eth_admin_exp'); return; }
+    adminWachtwoord = pin; isAdmin = true;
+    if($('loginOverlay')) $('loginOverlay').classList.remove('open');
+    await laadReglement(); await laadOrakel(); await laadOrakelTeams();
+    renderAlles(); renderReglement(); renderOrakel();
+  }catch(e){ /* offline: gewoon handmatig inloggen */ }
+}
+function ethHerstelSpeler(){
+  const naam = ethLees('eth_speler_naam');
+  if(!naam) return;
+  const team = (typeof data !== 'undefined' && data.teams) ? data.teams[naam] : null;
+  const ww = ethDeB64(ethLees('eth_speler_ww') || '');
+  if(team && team.wachtwoord && team.wachtwoord !== ww){ ethWis('eth_speler_naam','eth_speler_ww'); return; }
+  sbSessie = naam;
+  sbSessieWw = (team && team.wachtwoord) ? ww : '';
+  if($('sbNaam')) $('sbNaam').value = naam;
+  if(typeof sbToonInlog === 'function') sbToonInlog();
+  if(typeof sbHaalUitbetaal === 'function') sbHaalUitbetaal();
+}
 let bewerkRonde = null;
 let uploadBase64 = null, uploadMime = null;
 let spBase64 = null, spMime = null;
@@ -1641,6 +1682,10 @@ async function probeerLogin(){
     if(resp.ok){
       adminWachtwoord = pin;
       isAdmin = true;
+      if(!$('onthoudAdmin') || $('onthoudAdmin').checked){
+        ethBewaar('eth_admin_pin', ethB64(pin));
+        ethBewaar('eth_admin_exp', String(Date.now() + ETH_ADMIN_DAGEN*864e5));
+      } else { ethWis('eth_admin_pin','eth_admin_exp'); }
       $('loginOverlay').classList.remove('open');
       await laadReglement();
       await laadOrakel();
@@ -1664,6 +1709,7 @@ $('pinInvoer').addEventListener('keydown', e=>{ if(e.key==='Enter') probeerLogin
 function adminUitloggen(){
   isAdmin = false;
   adminWachtwoord = null;
+  ethWis('eth_admin_pin','eth_admin_exp');
   // Side Bets: sessie en opgehaalde uitbetaalgegevens niet laten hangen
   if(typeof sbUitbetaal !== 'undefined') sbUitbetaal = {};
   if(typeof sbSessie !== 'undefined'){
@@ -3022,6 +3068,7 @@ if($('dpWie')){
   renderOrakel();
   await laadDatumprikker();
   renderDatumprikker();
+  if(ETH_ADMIN_APP) await ethHerstelAdmin();
 })();
 
 /* =============== side bets =============== */
@@ -3783,6 +3830,8 @@ if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
   }
   sbSessie = naam;
   sbSessieWw = (team && team.wachtwoord) ? $('sbWw').value : '';
+  ethBewaar('eth_speler_naam', naam);
+  ethBewaar('eth_speler_ww', ethB64(sbSessieWw || ''));
   $('sbEigenBunqNaam').value = '';
   sbToonInlog();
   sbHaalUitbetaal();
@@ -3791,6 +3840,7 @@ if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
 });
 if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
   sbSessie = null; sbSessieWw = '';
+  ethWis('eth_speler_naam','eth_speler_ww');
   sbToonInlog();
   verbergStatus('sbSessieStatus');
   renderSidebets();
@@ -3852,7 +3902,7 @@ if(typeof renderAlles === 'function'){
   let pogingen = 0;
   const wachtOpNamen = setInterval(()=>{
     pogingen++;
-    if(alleDeelnemers().length){ renderSidebets(); clearInterval(wachtOpNamen); }
+    if(alleDeelnemers().length){ if(!ETH_ADMIN_APP && !sbSessie) ethHerstelSpeler(); renderSidebets(); clearInterval(wachtOpNamen); }
     else if(pogingen > 40) clearInterval(wachtOpNamen);   // na ~20 sec opgeven
   }, 500);
   // elke 2 minuten verversen zodat uitslagen vanzelf binnenkomen
