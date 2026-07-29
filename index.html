@@ -91,6 +91,15 @@
   button.stil{background:transparent;color:var(--chalk);border:1.5px solid var(--line)}
   button.gevaar{background:transparent;color:var(--red);border:1.5px solid rgba(224,85,72,.5)}
   button.mini{font-size:13px;padding:8px 16px}
+  /* Nette knoppen (voorheen ongestyled = standaard browserknop) */
+  .knop{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:'Barlow',sans-serif;font-weight:600;font-size:14px;line-height:1.2;background:var(--pitch-card);color:var(--chalk);border:1.5px solid var(--line);border-radius:9px;padding:9px 15px;cursor:pointer;transition:.15s;text-decoration:none;white-space:nowrap}
+  .knop:hover{border-color:var(--amber);filter:brightness(1.05)}
+  .knop:active{transform:translateY(1px)}
+  .knop:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .knop.primair{background:var(--amber);color:#1C1607;border-color:var(--amber);font-weight:700}
+  .knop.primair:hover{filter:brightness(1.08)}
+  .sb-ingelogd{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .sb-ingelogd-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(163,230,53,.15);border:1px solid rgba(163,230,53,.5);color:#a3e635;font-weight:700;padding:9px 15px;border-radius:9px;font-size:15px}
   .knoppenrij{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 
   .status{margin-top:14px;font-size:14px;padding:11px 14px;border-radius:10px;display:none}
@@ -546,11 +555,14 @@
     <!-- wie ben je -->
     <div class="card" id="sbSessieCard">
       <h2>Wie ben je?</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <div id="sbInlogVelden" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
         <select id="sbNaam" style="min-width:180px"></select>
         <input id="sbWw" type="password" placeholder="wachtwoord (indien ingesteld)" style="width:220px">
         <button class="knop primair" id="sbAanmelden">Aanmelden</button>
-        <button class="knop sb-verborgen" id="sbAfmelden">Afmelden</button>
+      </div>
+      <div id="sbIngelogd" class="sb-verborgen sb-ingelogd">
+        <span class="sb-ingelogd-badge">✅ Ingelogd als <strong id="sbIngelogdNaam"></strong></span>
+        <button class="knop" id="sbAfmelden">Afmelden</button>
       </div>
       <div id="sbEigenBunq" class="sb-verborgen" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <span style="color:var(--chalk-dim);font-size:14px">Uitbetaling <em>(optioneel)</em></span>
@@ -1656,8 +1668,7 @@ function adminUitloggen(){
   if(typeof sbUitbetaal !== 'undefined') sbUitbetaal = {};
   if(typeof sbSessie !== 'undefined'){
     sbSessie = null; sbSessieWw = '';
-    if($('sbAfmelden')) $('sbAfmelden').classList.add('sb-verborgen');
-    if($('sbEigenBunq')) $('sbEigenBunq').classList.add('sb-verborgen');
+    if(typeof sbToonInlog === 'function') sbToonInlog();
     if($('sbSessieStatus')) verbergStatus('sbSessieStatus');
   }
   gaNaarTab('p-standen');
@@ -3529,46 +3540,66 @@ function renderSbSeizoen(){
 
   // eigen status / meedoen
   if(sbSessie){
-    const deedOrakel = orakelNamen.includes(sbSessie);
+    const deedOrakel = orakelNamen.some(n => n.trim().toLowerCase() === String(sbSessie).trim().toLowerCase());
     const isBetaald  = !!(s.betaald || {})[sbSessie];
     const isAangemeld = aangemeld.includes(sbSessie);
     if(!deedOrakel){
       html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">Je kunt meedoen zodra je een <strong>Eredivisie Orakel</strong>-voorspelling hebt ingediend. Vul eerst het Orakel in, kom daarna hier terug.</p></div>`;
     } else if(isBetaald){
       html += `<div class="card" style="margin-top:12px"><strong style="color:#a3e635">✅ Je doet mee — inleg van €${inleg} bevestigd. Succes!</strong></div>`;
-    } else if(isAangemeld){
-      const link = sbBunqLink(inleg, `Orakel inleg ${sbSessie}`);
-      const knop = link ? `<a class="knop" href="${link}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none">💶 Betaal €${inleg} inleg</a>` : '';
-      html += `<div class="card" style="margin-top:12px">
-        <strong>Je bent aangemeld.</strong> Maak je inleg over; zodra de beheerder die bevestigt, sta je in de running.
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">${knop}<button class="knop" data-seizoen-afmelden="1">Afmelden</button></div>
-      </div>`;
     } else if(s.actief){
+      const link = sbBunqLink(inleg, `Orakel inleg ${sbSessie}`);
+      const betaalKnop = link
+        ? `<a class="knop primair" href="${link}" target="_blank" rel="noopener" data-seizoen-doemee="1" style="text-decoration:none">💶 Doe mee — betaal €${inleg} inleg</a>`
+        : `<button class="knop primair" data-seizoen-doemee="1">Doe mee (€${inleg})</button>`;
+      const afmeld = isAangemeld ? `<button class="knop" data-seizoen-afmelden="1">Afmelden</button>` : '';
+      const statusRegel = isAangemeld
+        ? `<p style="margin:8px 0 0;color:var(--amber)">⏳ Je bent aangemeld — je inleg is nog niet door de beheerder bevestigd. Betaald? Dan bevestigt de beheerder het zo.</p>`
+        : `<p class="uitleg" style="margin:8px 0 0">Eén klik: je meldt je aan én je bunq-betaalverzoek van €${inleg} opent meteen.${link?'':' Maak daarna €'+inleg+' over aan de beheerder.'}</p>`;
       html += `<div class="card" style="margin-top:12px">
-        <strong>Doe mee aan de seizoens-sidebet</strong> — €${inleg} inleg, winnaar krijgt de hele pot.
-        <div style="margin-top:8px"><button class="knop primair" data-seizoen-doemee="1">Doe mee (€${inleg})</button></div>
+        <strong>Doe mee aan de seizoens-sidebet</strong> — €${inleg} inleg, winner takes all.
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${betaalKnop}${afmeld}</div>
+        ${statusRegel}
       </div>`;
     }
   } else {
     html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">Meld je aan onder “Wie ben je?” om mee te doen.</p></div>`;
   }
 
-  // in de running
-  html += `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">In de running (${betaaldNamen.length})</h3>`;
-  if(stand){
-    const inRun = stand.filter(r=> r.betaald);
-    html += inRun.length
-      ? `<table class="stand"><tr><th></th><th>Deelnemer</th><th style="text-align:right">Orakel-punten</th></tr>`
-        + inRun.map((r,i)=>`<tr class="${i===0?'p1':''}"><td class="pos">${i+1}</td><td>${esc(r.naam)}${s.winnaar===r.naam?' 🏆':(i===0?' 👑':'')}</td><td class="num">${r.totaal}</td></tr>`).join('')
-        + `</table>`
-      : '<div class="leeg">Nog niemand heeft de inleg betaald.</div>';
+  // wie doet mee + lopend totaal
+  const wachtBetaling = aangemeld.filter(n=> !betaaldNamen.includes(n));
+  const totBinnen = betaaldNamen.length * inleg;
+  const totVerwacht = wachtBetaling.length * inleg;
+  html += `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Wie doet mee</h3>`;
+  if(!betaaldNamen.length && !wachtBetaling.length){
+    html += '<div class="leeg">Nog niemand aangemeld.</div>';
   } else {
-    html += betaaldNamen.length
-      ? `<div>${betaaldNamen.map(esc).join(', ')}</div>`
-      : '<div class="leeg">Nog niemand heeft de inleg betaald.</div>';
-    html += `<p class="uitleg" style="margin:8px 0 0">De ranglijst verschijnt zodra het Orakel is gepubliceerd (na start van de eerste speelronde).</p>`;
+    const rij = (naam, betaald) => `<div class="sb-adminrij"><span>${esc(naam)}${s.winnaar===naam?' 🏆':''}</span>`
+      + (betaald
+          ? '<span style="color:#a3e635;font-weight:700">✅ inleg binnen</span>'
+          : '<span style="color:var(--amber)">⏳ wacht op betaling</span>') + `</div>`;
+    html += `<div class="sb-adminlijst">`
+      + betaaldNamen.map(n=> rij(n,true)).join('')
+      + wachtBetaling.map(n=> rij(n,false)).join('')
+      + `</div>`;
+    html += `<div style="margin-top:12px;font-size:15px">Totaal inleg binnen: <strong style="color:var(--amber)">€${totBinnen}</strong>`
+      + (totVerwacht ? ` <span style="color:var(--chalk-dim)">(+ €${totVerwacht} aangemeld, nog te betalen)</span>` : '')
+      + `</div>`;
   }
   html += `</div>`;
+
+  // tussenstand van de pot (alleen zinvol als Orakel gepubliceerd)
+  if(stand){
+    const inRun = stand.filter(r=> r.betaald);
+    if(inRun.length){
+      html += `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Tussenstand — wie leidt de pot</h3>`
+        + `<table class="stand"><tr><th></th><th>Deelnemer</th><th style="text-align:right">Orakel-punten</th></tr>`
+        + inRun.map((r,i)=>`<tr class="${i===0?'p1':''}"><td class="pos">${i+1}</td><td>${esc(r.naam)}${s.winnaar===r.naam?' 🏆':(i===0?' 👑':'')}</td><td class="num">${r.totaal}</td></tr>`).join('')
+        + `</table></div>`;
+    }
+  } else if(betaaldNamen.length){
+    html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">De tussenstand van de pot verschijnt zodra het Orakel is gepubliceerd (na start van de eerste speelronde).</p></div>`;
+  }
 
   // kan nog meedoen
   const nogNiet = orakelNamen.filter(n=> !betaaldNamen.includes(n) && !aangemeld.includes(n));
@@ -3633,7 +3664,7 @@ async function sbSeizoenActie(payload, okMsg){
   }catch(e){ sbSeizoenMelding('fout', e.message); }
 }
 document.addEventListener('click', (ev)=>{
-  const t = ev.target.closest('button');
+  const t = ev.target.closest('button, a');
   if(!t) return;
   if(t.dataset.seizoenDoemee){
     if(!sbSessie){ toonStatus('sbSessieStatus','fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
@@ -3734,6 +3765,16 @@ document.addEventListener('click', async (ev)=>{
   }
 });
 
+/* Toont de aanmeld-velden of het "ingelogd"-blok op basis van de sessie. */
+function sbToonInlog(){
+  const ingelogd = !!sbSessie;
+  const velden = $('sbInlogVelden'), banner = $('sbIngelogd');
+  if(velden) velden.classList.toggle('sb-verborgen', ingelogd);
+  if(banner) banner.classList.toggle('sb-verborgen', !ingelogd);
+  if(ingelogd && $('sbIngelogdNaam')) $('sbIngelogdNaam').textContent = sbSessie;
+  if($('sbEigenBunq')) $('sbEigenBunq').classList.toggle('sb-verborgen', !ingelogd);
+  if($('sbWw')) $('sbWw').value = '';   // wachtwoordtekens niet laten staan
+}
 if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
   const naam = $('sbNaam').value;
   const team = data.teams[naam];
@@ -3742,17 +3783,15 @@ if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
   }
   sbSessie = naam;
   sbSessieWw = (team && team.wachtwoord) ? $('sbWw').value : '';
-  $('sbAfmelden').classList.remove('sb-verborgen');
-  $('sbEigenBunq').classList.remove('sb-verborgen');
   $('sbEigenBunqNaam').value = '';
+  sbToonInlog();
   sbHaalUitbetaal();
-  toonStatus('sbSessieStatus','info', `Aangemeld als <strong>${esc(naam)}</strong> ✓`);
+  toonStatus('sbSessieStatus','info', `Je bent ingelogd als <strong>${esc(naam)}</strong> — je kunt nu meedoen en betalen.`);
   renderSidebets();
 });
 if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
   sbSessie = null; sbSessieWw = '';
-  $('sbAfmelden').classList.add('sb-verborgen');
-  $('sbEigenBunq').classList.add('sb-verborgen');
+  sbToonInlog();
   verbergStatus('sbSessieStatus');
   renderSidebets();
 });
