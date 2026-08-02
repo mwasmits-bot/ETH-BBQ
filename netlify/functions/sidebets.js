@@ -11,7 +11,7 @@ import { getStore } from "@netlify/blobs";
 const MAX_INZET = 100;
 const KEUZES = ["thuis", "gelijk", "uit"];
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null } });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, inleg: 10, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null } });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -22,11 +22,21 @@ export default async (req) => {
   const isAdmin = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
+  // Eindstand-picks pas tonen als de uitslag vaststaat (of aan de admin) — voorkomt afkijken.
+  const eindstandPubliek = (e) => {
+    if (!e) return e;
+    const voorspeldDoor = Object.keys(e.voorspellingen || {});
+    const locked = !!(e.kampioen && e.laatste);
+    if (isAdmin || locked) return { ...e, voorspeldDoor };
+    return { ...e, voorspellingen: {}, voorspeldDoor };
+  };
+
   const laad = async () => {
     const s = await store.get("sidebets", { type: "json" });
     const basis = leegSchema();
     const sb = { ...basis, ...(s || {}) };
     sb.seizoen = { ...basis.seizoen, ...(sb.seizoen || {}) };
+    sb.eindstand = { ...basis.eindstand, ...(sb.eindstand || {}) };
     return sb;
   };
 
@@ -36,6 +46,7 @@ export default async (req) => {
     // van wie iets ingevuld heeft, zodat de app kan tonen wie nog moet.
     const { uitbetaal, ...publiek } = sb;
     publiek.heeftUitbetaal = Object.keys(uitbetaal || {});
+    publiek.eindstand = eindstandPubliek(publiek.eindstand);
     return Response.json(publiek, { headers: { "cache-control": "no-store" } });
   }
 
@@ -63,7 +74,7 @@ export default async (req) => {
   }
 
   const bewaar = async () => { await store.set("sidebets", JSON.stringify(sb)); };
-  const schoonAntwoord = (o) => { const { uitbetaal, ...p } = o; p.heeftUitbetaal = Object.keys(uitbetaal || {}); return p; };
+  const schoonAntwoord = (o) => { const { uitbetaal, ...p } = o; p.heeftUitbetaal = Object.keys(uitbetaal || {}); p.eindstand = eindstandPubliek(p.eindstand); return p; };
 
   try {
     // ================= ADMIN-ACTIES =================
@@ -152,6 +163,67 @@ export default async (req) => {
         return Response.json({ fout: "Je inleg is al bevestigd — vraag de beheerder om je af te melden." }, { status: 400 });
       }
       delete sb.seizoen.aangemeld[naam];
+      await bewaar();
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
+    // ============= EINDSTAND (kampioen + bbq-loser) — ADMIN =============
+    if (["eindstand-instellingen", "eindstand-betaald", "eindstand-uitslag"].includes(body.actie)) {
+      if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
+
+      if (body.actie === "eindstand-instellingen") {
+        if (typeof body.actief === "boolean") sb.eindstand.actief = body.actief;
+        if (body.inleg !== undefined) {
+          const n = parseInt(body.inleg, 10);
+          if (Number.isInteger(n) && n >= 1 && n <= 1000) sb.eindstand.inleg = n;
+        }
+        if (Array.isArray(body.kandidaten)) {
+          sb.eindstand.kandidaten = body.kandidaten.map(x => String(x).trim()).filter(Boolean).slice(0, 64);
+        }
+      }
+
+      if (body.actie === "eindstand-betaald") {
+        const naam = String(body.naam || "").trim();
+        if (!naam) return Response.json({ fout: "Geen naam opgegeven." }, { status: 400 });
+        if (body.waarde) sb.eindstand.betaald[naam] = true;
+        else delete sb.eindstand.betaald[naam];
+      }
+
+      if (body.actie === "eindstand-uitslag") {
+        const kand = sb.eindstand.kandidaten || [];
+        const k = body.kampioen ? String(body.kampioen).trim() : null;
+        const l = body.laatste ? String(body.laatste).trim() : null;
+        if (k && !kand.includes(k)) return Response.json({ fout: "Kampioen staat niet in de kandidatenlijst." }, { status: 400 });
+        if (l && !kand.includes(l)) return Response.json({ fout: "Laatste staat niet in de kandidatenlijst." }, { status: 400 });
+        sb.eindstand.kampioen = k;
+        sb.eindstand.laatste = l;
+      }
+
+      await bewaar();
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
+    // ============= EINDSTAND — DEELNEMER =============
+    if (body.actie === "eindstand-voorspel") {
+      const { deelnemer, wachtwoord, kampioen, laatste } = body;
+      const fout = controleerDeelnemer(deelnemer, wachtwoord);
+      if (fout) return Response.json({ fout }, { status: 401 });
+      if (!sb.eindstand.actief && !isAdmin) {
+        return Response.json({ fout: "De eindstand-bet staat nog niet open." }, { status: 403 });
+      }
+      if ((sb.eindstand.kampioen || sb.eindstand.laatste) && !isAdmin) {
+        return Response.json({ fout: "De uitslag is al bekend — voorspellen kan niet meer." }, { status: 400 });
+      }
+      const kand = sb.eindstand.kandidaten || [];
+      const k = String(kampioen || "").trim();
+      const l = String(laatste || "").trim();
+      if (!kand.includes(k) || !kand.includes(l)) {
+        return Response.json({ fout: "Kies een geldige kampioen én laatste uit de lijst." }, { status: 400 });
+      }
+      if (k === l) {
+        return Response.json({ fout: "Kampioen en laatste moeten verschillende deelnemers zijn." }, { status: 400 });
+      }
+      sb.eindstand.voorspellingen[String(deelnemer).trim()] = { kampioen: k, laatste: l };
       await bewaar();
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
