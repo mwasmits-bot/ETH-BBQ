@@ -2446,6 +2446,40 @@ async function laadLiveStand(){
   }catch(e){}
 }
 
+/* Haalt de eigen ingediende voorspelling op (ook vóór publicatie) en vult het formulier,
+   zodat een ingelogde deelnemer ziet wat hij invulde en het tot de deadline kan wijzigen. */
+let orakelEigenGeladenVoor = null;
+async function laadEigenOrakel(force){
+  if(typeof sbSessie === 'undefined' || !sbSessie) return;
+  if(!force && orakelEigenGeladenVoor === sbSessie) return;
+  if(!orakelInfo || !orakelInfo.deadlineEpoch) return;
+  const open = Date.now() < orakelInfo.deadlineEpoch;
+  if(!open) return;   // na de deadline staat het vast; renderOrakel toont dan de stand
+  try{
+    const r = await fetch(ORAKEL_API, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ actie:'mijn', deelnemer:sbSessie, wachtwoord:sbSessieWw })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) return;
+    orakelEigenGeladenVoor = sbSessie;
+    const teamNamen = (orakelInfo.teams||[]).map(t=>t.naam);
+    if(j.voorspelling){
+      let v = (j.voorspelling.volgorde||[]).filter(n=>teamNamen.includes(n));
+      teamNamen.forEach(n=>{ if(!v.includes(n)) v.push(n); });   // vul aan mochten teams gewijzigd zijn
+      if(v.length === teamNamen.length) orakelVolgorde = v;
+      const ts = j.voorspelling.topscorers||[];
+      if($('orakelTs1')) $('orakelTs1').value = ts[0]||'';
+      if($('orakelTs2')) $('orakelTs2').value = ts[1]||'';
+      if($('orakelTs3')) $('orakelTs3').value = ts[2]||'';
+      if($('orakelTeams')) renderOrakelTeams();
+      toonStatus('orakelStatus','info','✓ Je hebt al ingediend — hieronder staat je huidige voorspelling. Je kunt hem tot de deadline aanpassen en opnieuw indienen.');
+    } else {
+      toonStatus('orakelStatus','info','Je hebt nog niet ingediend — vul hieronder je voorspelling in en dien deze in.');
+    }
+  }catch(e){ /* stil */ }
+}
+
 function orakelScore(v){
   const posEcht = {};
   liveStand.stand.forEach(r=>{ posEcht[normO(r.naam)] = r.positie; });
@@ -2583,6 +2617,7 @@ $('btnOrakelIndienen').addEventListener('click', async ()=>{
     });
     const j = await r.json().catch(()=>({}));
     if(r.ok){
+      orakelEigenGeladenVoor = naam;
       toonStatus('orakelStatus','info','🔮 Voorspelling van '+esc(naam)+' opgeslagen! Je kunt hem tot de deadline nog aanpassen door opnieuw in te dienen.');
       await laadOrakel();
       renderOrakelStand();
@@ -3597,7 +3632,7 @@ function sbToonView(){
   if($('sbNavEindstand')) $('sbNavEindstand').classList.toggle('primair', sbView==='eindstand');
 }
 if($('sbNavRonde'))     $('sbNavRonde').addEventListener('click', ()=>{ sbView='ronde'; sbToonView(); });
-if($('sbNavOrakel'))    $('sbNavOrakel').addEventListener('click', ()=>{ sbView='orakel'; sbSyncOrakelSessie(); sbToonView(); });
+if($('sbNavOrakel'))    $('sbNavOrakel').addEventListener('click', ()=>{ sbView='orakel'; sbSyncOrakelSessie(); sbToonView(); if(typeof laadEigenOrakel==='function') laadEigenOrakel(); });
 if($('sbNavEindstand')) $('sbNavEindstand').addEventListener('click', ()=>{ sbView='eindstand'; sbToonView(); });
 
 function sbSeizoen(){ return sbData.seizoen || { actief:false, inleg:20, aangemeld:{}, betaald:{}, winnaar:null }; }
@@ -4054,6 +4089,8 @@ if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
   sluitSpelerLogin();
   sbToonInlog();
   sbSyncOrakelSessie();
+  orakelEigenGeladenVoor = null;
+  if(typeof laadEigenOrakel==='function') laadEigenOrakel(true);
   if(typeof sbHaalUitbetaal==='function') sbHaalUitbetaal();
   if(typeof renderSidebets==='function') renderSidebets();
   if(typeof renderOrakel==='function') renderOrakel();
@@ -4062,6 +4099,7 @@ if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
 if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
   sbSessie = null; sbSessieWw = '';
   ethWis('eth_speler_naam','eth_speler_ww','eth_speler_exp');
+  orakelEigenGeladenVoor = null;
   sbToonInlog();
   sbSyncOrakelSessie();
   verbergStatus('sbSessieStatus');
