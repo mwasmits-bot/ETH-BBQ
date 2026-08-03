@@ -557,7 +557,7 @@
         </label>
         <button class="knop" id="sbBewaarBunq">Opslaan</button>
       </div>
-      <p class="uitleg" style="margin-bottom:0">De bunq.me-naam is het stukje achter bunq.me/ in je eigen betaallink. Vul je die in, dan krijgt elke speler een kant-en-klaar betaalverzoek te zien.</p>
+      <p class="uitleg" style="margin-bottom:0">De bunq.me-naam is het stukje achter bunq.me/ in je eigen betaallink. Vul je die in, dan krijgt elke speler een kant-en-klaar betaalverzoek te zien voor de inleg. Betalen kan iedereen via de link (ook zonder bunq).</p>
       <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
         <button class="knop primair" id="sbAfrekenMail">📧 Mail mij de weekend-afrekening</button>
         <p class="uitleg" style="margin:8px 0 0">Overzicht van alle afgeronde bets, met per winnaar één netto bedrag — geen losse tikkies meer. De mail gaat naar je eigen mailbox.</p>
@@ -3856,11 +3856,17 @@ function renderSbEindstand(){
         </div>
         ${heeftVoorspeld ? '<div style="margin-top:8px;color:#a3e635;font-size:14px">✓ Je voorspelling is opgeslagen'+(mijn?` — kampioen ${esc(mijn.kampioen)}, laatste ${esc(mijn.laatste)}`:'')+'.</div>' : ''}
       </div>`;
-      if(heeftVoorspeld && !isBetaald){
-        const link = (typeof sbBunqLink==='function') ? sbBunqLink(inleg, `Eindstand-bet ${sbSessie}`) : null;
-        const knop = link ? `<a class="knop primair" href="${link}" target="_blank" rel="noopener" style="text-decoration:none">💶 Betaal €${inleg} inleg</a>` : '<span class="uitleg">De beheerder heeft nog geen betaallink ingesteld.</span>';
-        html += `<div class="card" style="margin-top:12px"><strong>Maak je inleg over</strong> om mee te dingen naar de pot.<div style="margin-top:8px">${knop}</div></div>`;
-      } else if(isBetaald){
+      if(!isBetaald){
+        const link = sbBunqLink(inleg, `Eindstand-inleg ${sbSessie}`);
+        const knop = link
+          ? `<a class="knop primair" href="${link}" target="_blank" rel="noopener" style="text-decoration:none">💶 Betaal €${inleg} inleg</a>`
+          : `<span class="uitleg">De beheerder heeft nog geen bunq.me-naam ingesteld — maak €${inleg} over aan de beheerder.</span>`;
+        html += `<div class="card" style="margin-top:12px">
+          <strong>💶 Meedoen om de pot — €${inleg} inleg</strong>
+          <p class="uitleg" style="margin:6px 0 9px">Betaal de inleg om mee te dingen naar de pot. Vergeet niet ook je voorspelling hierboven op te slaan.</p>
+          ${knop}
+        </div>`;
+      } else {
         html += `<div class="card" style="margin-top:12px"><strong style="color:#a3e635">✅ Je inleg is bevestigd — je doet mee om de pot.</strong></div>`;
       }
     }
