@@ -4,7 +4,7 @@
 // - Als een deelnemer een wachtwoord heeft, moet dat kloppen voordat de voorspelling
 //   wordt aanvaard (voorkomt dat iemand als een ander inlogt).
 // - Voorspellingen van anderen zijn pas zichtbaar als de admin publiceert.
-// - De admin (met x-wachtwoord) kan voorspellingen verwijderen.
+// - De admin (met x-wachtwoord) ziet altijd alles.
 import { getStore } from "@netlify/blobs";
 
 export default async (req) => {
@@ -12,7 +12,7 @@ export default async (req) => {
   const hoofd = await store.get("poule", { type: "json" });
   const instellingen = (hoofd && hoofd.orakel) || {};
   const teams = hoofd && hoofd.teams ? hoofd.teams : {};
-  let voorspellingen = (await store.get("orakel", { type: "json" })) || {};
+  const voorspellingen = (await store.get("orakel", { type: "json" })) || {};
   const isAdminReq = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
@@ -29,37 +29,24 @@ export default async (req) => {
   }
 
   if (req.method === "POST") {
-    // Admin-only: voorspellingen verwijderen
-    if (req.url.includes("verwijder=1")) {
-      if (!isAdminReq) {
-        return Response.json({ fout: "Alleen admin kan verwijderen." }, { status: 401 });
-      }
-      let body;
-      try { body = await req.json(); } catch (e) {
-        console.error("JSON parse:", e.message);
-        return Response.json({ fout: "Verzoek kon niet worden gelezen." }, { status: 400 });
-      }
-      const { naam } = body || {};
-      if (!naam || typeof naam !== "string") {
-        return Response.json({ fout: "Geen deelnemer opgegeven." }, { status: 400 });
-      }
-      try {
-        // Huidige voorspellingen ophalen
-        const huidig = (await store.get("orakel", { type: "json" })) || {};
-        // Verwijder de entry
-        delete huidig[naam];
-        // Sla terug op
-        await store.setJSON("orakel", huidig);
-        return Response.json({ ok: true });
-      } catch (e) {
-        console.error("Verwijderen:", e.message);
-        return Response.json({ fout: "Verwijderen mislukt." }, { status: 500 });
-      }
-    }
-
-    // Normale indiening door deelnemer
     let body;
     try { body = await req.json(); } catch { body = null; }
+
+    // Eigen voorspelling ophalen (ook vóór publicatie), na wachtwoordcontrole.
+    if (body && body.actie === "mijn") {
+      const naam = String(body.deelnemer || "").trim();
+      const team = teams[naam];
+      if (!team) return Response.json({ fout: "Deelnemer niet gevonden." }, { status: 400 });
+      if (team.wachtwoord && String(body.wachtwoord || "") !== team.wachtwoord) {
+        return Response.json({ fout: "Onjuist wachtwoord voor deze deelnemer." }, { status: 401 });
+      }
+      return Response.json({
+        ok: true,
+        voorspelling: voorspellingen[naam] || null,
+        deadlineEpoch: instellingen.deadlineEpoch || null
+      }, { headers: { "cache-control": "no-store" } });
+    }
+
     const { deelnemer, wachtwoord, volgorde, topscorers } = body || {};
     
     if (!deelnemer || !String(deelnemer).trim() || !Array.isArray(volgorde) || !Array.isArray(topscorers)) {
