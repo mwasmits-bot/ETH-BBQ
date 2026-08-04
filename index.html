@@ -422,7 +422,8 @@
   <section class="paneel" id="p-orakel">
     <div class="card">
       <h2>🔮 Het Eredivisie Orakel</h2>
-      <p class="uitleg">Voorspel vóór de aftrap van de eerste wedstrijd de <strong>volledige eindstand</strong> van de eredivisie én de <strong>top 3 topscorers</strong>. Puntentelling: 3 punten per team op exact de juiste plek, 1 punt als je er één plek naast zit, en <strong>+5 bonus voor de juiste kampioen</strong>. Topscorers: <strong>elk doelpunt van een door jou getipte topscorer levert 2 punten op</strong> — alle drie je spelers tellen mee. Je kunt je voorspelling tot de deadline aanpassen (opnieuw indienen overschrijft de vorige).</p>
+      <p class="uitleg">Voorspel de <strong>volledige eindstand</strong> van de eredivisie én je <strong>top 3 topscorers</strong>. Puntentelling: 3 punten per team op exact de juiste plek, 1 punt als je er één plek naast zit, <strong>+5 bonus voor de juiste kampioen</strong>, en <strong>2 punten voor elk doelpunt van een getipte topscorer</strong> (alle drie tellen mee — hun volledige seizoenstotaal).<br><br>
+      <strong>Let op — twee deadlines:</strong> je volledige voorspelling (eindstand + topscorers) sluit bij de <strong>aftrap van de 1e speelronde</strong>. Daarna wordt er nog volop getransferd — de Nederlandse transfermarkt sluit pas op <strong>2 september</strong>. Tot die transferdeadline krijg je daarom <strong>2 gouden wissels</strong>: je mag dan maximaal 2 van je 3 topscorers vervangen, nooit alle 3 (minstens 1 origineel blijft staan). Je teamvolgorde ligt na de 1e speelronde vast. Wissel je een topscorer, dan telt gewoon het volledige seizoenstotaal van je huidige 3 topscorers.</p>
       <div class="status info zichtbaar" id="orakelDeadlineInfo" style="margin-top:0">Deadline wordt geladen…</div>
       <div id="orakelFormulier" style="display:none">
         <div class="rondekop" id="orakelLoginRow" style="display:none">
@@ -436,7 +437,8 @@
           </div>
         </div>
         <div id="orakelWieBenIk" style="margin-bottom:12px;color:var(--chalk-dim);font-size:14px"></div>
-        <h3>1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
+        <div id="orakelWisselBlok" style="display:none"></div>
+        <h3 id="orakelTeamKop">1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
         <div id="orakelTeams"></div>
         <h3 style="margin-top:20px">2 · Top 3 topscorers</h3>
         <p class="uitleg" style="font-size:14px">Typ de namen van de drie spelers die volgens jou de meeste doelpunten maken. Schrijf ze zo volledig mogelijk (bijv. "Brian Brobbey").</p>
@@ -465,6 +467,12 @@
       <div class="rondekop">
         <input type="datetime-local" id="orakelDeadlineInput" style="max-width:240px;background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px">
         <button class="actie mini" id="btnOrakelDeadline">Deadline opslaan</button>
+      </div>
+      <h3 style="margin-top:18px">Gouden-wissel-deadline (transferdeadline)</h3>
+      <p class="uitleg" style="margin-top:0">Tot dit moment mogen deelnemers ná de 1e speelronde nog max. 2 topscorers wisselen. Laat leeg als je geen wissels wilt toestaan. (NL-transferdeadline 2026: wo 2 sept, 23:59.)</p>
+      <div class="rondekop">
+        <input type="datetime-local" id="orakelWisselDeadlineInput" style="max-width:240px;background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px">
+        <button class="actie mini" id="btnOrakelWisselDeadline">Wissel-deadline opslaan</button>
       </div>
       <h3 style="margin-top:18px">Teams (18)</h3>
       <p class="uitleg">Haal de teams met logo's op via de football-data.org API (vereist FOOTBALL_DATA_KEY in Netlify), of plak hieronder handmatig één teamnaam per regel.</p>
@@ -956,7 +964,7 @@ function migreer(d){
   if(!d.teams) d.teams = {};
   if(!d.spelerpunten) d.spelerpunten = {};
   if(!d.halloffame) d.halloffame = [];
-  if(!d.orakel) d.orakel = { deadline:'', deadlineEpoch:null, gepubliceerd:false, teams:[] };
+  if(!d.orakel) d.orakel = { deadline:'', deadlineEpoch:null, wisselDeadline:'', wisselDeadlineEpoch:null, gepubliceerd:false, teams:[] };
   Object.keys(d.rounds).forEach(nr=>{
     const r = d.rounds[nr];
     if(r && r.scores === undefined) d.rounds[nr] = { scores: r };
@@ -2429,6 +2437,8 @@ async function laadOrakel(){
 
 let liveStand = null;    // {stand:[{positie,naam,logo,punten}], scorers:[{naam,goals}], bijgewerkt}
 let orakelVolgorde = []; // huidige volgorde in het formulier (teamnamen)
+let orakelFase = 'gesloten'; // voorspellen | wissel | gesloten
+let orakelBasis = null;      // topscorers zoals vastgelegd bij de 1e speelronde
 
 function normO(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 
@@ -2453,8 +2463,12 @@ async function laadEigenOrakel(force){
   if(typeof sbSessie === 'undefined' || !sbSessie) return;
   if(!force && orakelEigenGeladenVoor === sbSessie) return;
   if(!orakelInfo || !orakelInfo.deadlineEpoch) return;
-  const open = Date.now() < orakelInfo.deadlineEpoch;
-  if(!open) return;   // na de deadline staat het vast; renderOrakel toont dan de stand
+  const nu = Date.now();
+  const d1 = orakelInfo.deadlineEpoch;
+  const d2 = orakelInfo.wisselDeadlineEpoch;
+  const actief = (nu < d1) || (d2 && nu < d2);   // voorspel- of wisselfase
+  if(!actief) return;   // gesloten -> renderOrakel toont de stand
+  const wissel = (nu >= d1);
   try{
     const r = await fetch(ORAKEL_API, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -2465,6 +2479,7 @@ async function laadEigenOrakel(force){
     orakelEigenGeladenVoor = sbSessie;
     const teamNamen = (orakelInfo.teams||[]).map(t=>t.naam);
     if(j.voorspelling){
+      orakelBasis = j.voorspelling.topscorersBasis || j.voorspelling.topscorers || null;
       let v = (j.voorspelling.volgorde||[]).filter(n=>teamNamen.includes(n));
       teamNamen.forEach(n=>{ if(!v.includes(n)) v.push(n); });   // vul aan mochten teams gewijzigd zijn
       if(v.length === teamNamen.length) orakelVolgorde = v;
@@ -2473,9 +2488,15 @@ async function laadEigenOrakel(force){
       if($('orakelTs2')) $('orakelTs2').value = ts[1]||'';
       if($('orakelTs3')) $('orakelTs3').value = ts[2]||'';
       if($('orakelTeams')) renderOrakelTeams();
-      toonStatus('orakelStatus','info','✓ Je hebt al ingediend — hieronder staat je huidige voorspelling. Je kunt hem tot de deadline aanpassen en opnieuw indienen.');
+      if(typeof updateWisselTeller==='function') updateWisselTeller();
+      toonStatus('orakelStatus','info', wissel
+        ? '✓ Je voorspelling staat vast. Je kunt nu nog max. 2 topscorers wisselen tot de transferdeadline.'
+        : '✓ Je hebt al ingediend — hieronder staat je huidige voorspelling. Je kunt hem tot de deadline aanpassen en opnieuw indienen.');
     } else {
-      toonStatus('orakelStatus','info','Je hebt nog niet ingediend — vul hieronder je voorspelling in en dien deze in.');
+      orakelBasis = null;
+      toonStatus('orakelStatus', wissel?'fout':'info', wissel
+        ? 'Je hebt vóór de 1e speelronde geen voorspelling ingediend — meedoen kan niet meer.'
+        : 'Je hebt nog niet ingediend — vul hieronder je voorspelling in en dien deze in.');
     }
   }catch(e){ /* stil */ }
 }
@@ -2512,29 +2533,33 @@ function renderOrakel(){
   if(!$('orakelDeadlineInfo')) return;
   const info = orakelInfo;
   const deadlineInfo = $('orakelDeadlineInfo');
-  const open = info && info.deadlineEpoch && Date.now() < info.deadlineEpoch;
-
-  // deadline-balk
-  if(!info){ deadlineInfo.textContent = 'Het Orakel kan de server niet bereiken.'; }
-  else if(!info.deadlineEpoch){ deadlineInfo.textContent = 'De beheerder heeft de deadline nog niet ingesteld — nog even geduld.'; }
-  else if(open){
-    const ms = info.deadlineEpoch - Date.now();
-    const d = Math.floor(ms/86400000), u = Math.floor(ms%86400000/3600000), m = Math.floor(ms%3600000/60000);
-    deadlineInfo.textContent = '⏳ Voorspellen kan nog ' + (d>0? d+' dagen, ':'') + u + ' uur en ' + m + ' minuten (tot ' + new Date(info.deadlineEpoch).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'}) + ')';
-  } else {
-    deadlineInfo.textContent = '🔒 De deadline is verstreken — het seizoen is begonnen. Voorspellen kan niet meer.';
-  }
-
-  // formulier tonen/verbergen
+  const nu = Date.now();
+  const d1 = info && info.deadlineEpoch;
+  const d2 = info && info.wisselDeadlineEpoch;
   const teams = info ? (info.teams||[]) : [];
-  $('orakelFormulier').style.display = (open && teams.length) ? 'block' : 'none';
-  $('orakelGesloten').style.display = (open && teams.length) ? 'none' : 'block';
-  $('orakelGesloten').textContent = !open && info && info.deadlineEpoch
-    ? 'De voorspellingen staan vast. Bekijk hieronder de Orakel-stand!'
-    : (open && !teams.length ? 'De teams zijn nog niet ingesteld door de beheerder.' : '');
 
-  if(open && teams.length){
-    // naam-dropdown
+  let fase = 'gesloten';
+  if(d1 && nu < d1) fase = 'voorspellen';
+  else if(d1 && d2 && nu >= d1 && nu < d2) fase = 'wissel';
+  orakelFase = fase;
+
+  const fmt = ep => new Date(ep).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
+  const rester = ep => { const ms=ep-nu, d=Math.floor(ms/86400000), u=Math.floor(ms%86400000/3600000), m=Math.floor(ms%3600000/60000); return (d>0? d+' dagen, ':'')+u+' uur en '+m+' minuten'; };
+
+  if(!info){ deadlineInfo.textContent = 'Het Orakel kan de server niet bereiken.'; }
+  else if(!d1){ deadlineInfo.textContent = 'De beheerder heeft de deadline nog niet ingesteld — nog even geduld.'; }
+  else if(fase==='voorspellen'){ deadlineInfo.innerHTML = '⏳ Voorspellen kan nog ' + rester(d1) + ' (tot ' + fmt(d1) + ')'; }
+  else if(fase==='wissel'){ deadlineInfo.innerHTML = '🔁 Je volledige voorspelling staat vast. Je kunt je topscorers nog aanpassen met <strong>max. 2 gouden wissels</strong>, nog ' + rester(d2) + ' (tot ' + fmt(d2) + ').'; }
+  else { deadlineInfo.textContent = '🔒 Gesloten — voorspellen en wisselen kan niet meer. Bekijk hieronder de stand.'; }
+
+  const formOpen = (fase==='voorspellen' || fase==='wissel') && teams.length;
+  $('orakelFormulier').style.display = formOpen ? 'block' : 'none';
+  $('orakelGesloten').style.display = formOpen ? 'none' : 'block';
+  $('orakelGesloten').textContent = (fase==='gesloten' && d1)
+    ? 'De voorspellingen staan vast. Bekijk hieronder de Orakel-stand!'
+    : (((fase==='voorspellen'||fase==='wissel') && !teams.length) ? 'De teams zijn nog niet ingesteld door de beheerder.' : '');
+
+  if(formOpen){
     const sel = $('orakelNaam');
     const huidig = sel.value;
     const namen = alleDeelnemers();
@@ -2542,30 +2567,57 @@ function renderOrakel(){
       + namen.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
       + '<option value="__anders__">Andere naam…</option>';
     if(huidig && [...sel.options].some(o=>o.value===huidig)) sel.value = huidig;
-    // teamlijst initialiseren (alfabetisch) als die nog leeg is of niet meer klopt
     const teamNamen = teams.map(t=>t.naam);
     if(orakelVolgorde.length !== teamNamen.length || !orakelVolgorde.every(n=>teamNamen.includes(n))){
       orakelVolgorde = [...teamNamen].sort((a,b)=>a.localeCompare(b,'nl'));
     }
     renderOrakelTeams();
+
+    const wissel = fase==='wissel';
+    if($('orakelTeamKop')) $('orakelTeamKop').innerHTML = wissel
+      ? '1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--chalk-dim)">— ligt vast sinds de 1e speelronde</span>'
+      : '1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span>';
+    if($('btnOrakelIndienen')) $('btnOrakelIndienen').textContent = wissel ? '🔁 Gouden wissel opslaan' : '🔮 Voorspelling indienen';
+    const wb = $('orakelWisselBlok');
+    if(wb){
+      if(wissel){
+        wb.style.display = 'block';
+        wb.innerHTML = '<div class="status info zichtbaar" style="margin:0 0 14px">🔁 <strong>Gouden wissels</strong> — je mag nog max. 2 van je 3 topscorers vervangen (minstens 1 origineel moet blijven staan). Je teamvolgorde ligt vast. <span id="orakelWisselTeller"></span></div>';
+      } else { wb.style.display = 'none'; }
+    }
+    updateWisselTeller();
   }
   renderOrakelStand();
   renderOrakelAdmin();
 }
 
+function updateWisselTeller(){
+  const el = $('orakelWisselTeller');
+  if(!el) return;
+  if(orakelFase !== 'wissel' || !orakelBasis){ el.textContent = ''; return; }
+  const lc = x => String(x).trim().toLowerCase();
+  const basisLc = new Set(orakelBasis.map(lc));
+  const huidig = [$('orakelTs1').value, $('orakelTs2').value, $('orakelTs3').value].map(lc).filter(Boolean);
+  const gewisseld = Math.max(0, 3 - [...basisLc].filter(b => huidig.includes(b)).length);
+  el.innerHTML = 'Nu gewisseld: <strong>' + Math.min(gewisseld,3) + ' van 2</strong>.'
+    + (gewisseld > 2 ? ' <span style="color:var(--red)">Te veel — zet er minstens 1 origineel terug.</span>' : '');
+}
+
 function renderOrakelTeams(){
   const teams = (orakelInfo && orakelInfo.teams) || [];
+  const readonly = (orakelFase === 'wissel');
   const logoVoor = {}; teams.forEach(t=>logoVoor[t.naam] = t.logo||'');
   $('orakelTeams').innerHTML = orakelVolgorde.map((naam,i)=>`
-    <div class="orakel-rij" draggable="true" data-idx="${i}">
+    <div class="orakel-rij${readonly?' vast':''}" ${readonly?'':'draggable="true"'} data-idx="${i}">
       <span class="plek">${i+1}</span>
       ${logoVoor[naam] ? `<img src="${esc(logoVoor[naam])}" alt="">` : ''}
       <span class="tnaam">${esc(naam)}</span>
-      <span class="pijlen">
+      ${readonly ? '' : `<span class="pijlen">
         <button type="button" data-actie="op" data-idx="${i}" aria-label="Omhoog">▲</button>
         <button type="button" data-actie="neer" data-idx="${i}" aria-label="Omlaag">▼</button>
-      </span>
+      </span>`}
     </div>`).join('');
+  if(readonly) return;
   const houder = $('orakelTeams');
   houder.querySelectorAll('button[data-actie]').forEach(b=>b.addEventListener('click', ()=>{
     const i = Number(b.dataset.idx);
@@ -2600,6 +2652,7 @@ $('orakelNaam').addEventListener('change', ()=>{
   if(!heeftWw) $('orakelWachtwoord').value = '';
 });
 
+['orakelTs1','orakelTs2','orakelTs3'].forEach(id=>{ if($(id)) $(id).addEventListener('input', ()=>{ if(typeof updateWisselTeller==='function') updateWisselTeller(); }); });
 $('btnOrakelIndienen').addEventListener('click', async ()=>{
   const naam = (typeof sbSessie!=='undefined' && sbSessie) ? sbSessie : $('orakelNaam').value;
   if(!naam){ if(typeof openSpelerLogin==='function') openSpelerLogin(); toonStatus('orakelStatus','fout','Log eerst in om je voorspelling te doen.'); return; }
@@ -2608,7 +2661,13 @@ $('btnOrakelIndienen').addEventListener('click', async ()=>{
   if(team && team.wachtwoord && !wachtwoord){ toonStatus('orakelStatus','fout','Vul je wachtwoord in.'); return; }
   const topscorers = [$('orakelTs1').value.trim(), $('orakelTs2').value.trim(), $('orakelTs3').value.trim()];
   if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Vul alle drie de topscorers in.'); return; }
-  toonStatus('orakelStatus','info','<span class="laden"></span>Voorspelling wordt ingediend…');
+  if(orakelFase==='wissel' && orakelBasis){
+    const lc=x=>String(x).trim().toLowerCase();
+    const basisLc=new Set(orakelBasis.map(lc));
+    const behouden=[...basisLc].filter(b=>topscorers.map(lc).includes(b)).length;
+    if(behouden<1){ toonStatus('orakelStatus','fout','Je mag max. 2 topscorers wisselen — minstens 1 van je oorspronkelijke 3 moet blijven staan.'); return; }
+  }
+  toonStatus('orakelStatus','info','<span class="laden"></span>'+(orakelFase==='wissel'?'Gouden wissel wordt opgeslagen…':'Voorspelling wordt ingediend…'));
   try{
     const r = await fetch(ORAKEL_API, {
       method:'POST',
@@ -2618,7 +2677,9 @@ $('btnOrakelIndienen').addEventListener('click', async ()=>{
     const j = await r.json().catch(()=>({}));
     if(r.ok){
       orakelEigenGeladenVoor = naam;
-      toonStatus('orakelStatus','info','🔮 Voorspelling van '+esc(naam)+' opgeslagen! Je kunt hem tot de deadline nog aanpassen door opnieuw in te dienen.');
+      toonStatus('orakelStatus','info', orakelFase==='wissel'
+        ? '🔁 Gouden wissel opgeslagen! Je huidige 3 topscorers tellen mee.'
+        : '🔮 Voorspelling van '+esc(naam)+' opgeslagen! Je kunt hem tot de deadline nog aanpassen door opnieuw in te dienen.');
       await laadOrakel();
       renderOrakelStand();
       renderOrakelAdmin();
@@ -2718,6 +2779,7 @@ function renderOrakelAdmin(){
   if(!isAdmin) return;
   renderAliassen();
   if(data.orakel && data.orakel.deadline) $('orakelDeadlineInput').value = data.orakel.deadline;
+  if(data.orakel && data.orakel.wisselDeadline) $('orakelWisselDeadlineInput').value = data.orakel.wisselDeadline;
   $('btnOrakelPubliceer').textContent = (data.orakel && data.orakel.gepubliceerd)
     ? '🔓 Gepubliceerd — klik om te verbergen' : '🔒 Nog verborgen — klik om te publiceren';
   const vs = (orakelInfo && orakelInfo.voorspellingen) || {};
@@ -2770,6 +2832,16 @@ $('btnOrakelDeadline').addEventListener('click', async ()=>{
   await laadOrakel();
   renderOrakel();
   toonStatus('orakelAdminStatus','info','Deadline opgeslagen ✓ — voorspellen kan tot precies dat moment.');
+});
+$('btnOrakelWisselDeadline').addEventListener('click', async ()=>{
+  if(!isAdmin) return;
+  const val = $('orakelWisselDeadlineInput').value;
+  data.orakel.wisselDeadline = val || '';
+  data.orakel.wisselDeadlineEpoch = val ? new Date(val).getTime() : null;
+  await bewaarData('orakelAdminStatus');
+  await laadOrakel();
+  renderOrakel();
+  toonStatus('orakelAdminStatus','info', val ? 'Gouden-wissel-deadline opgeslagen ✓ — na de 1e speelronde mag men tot dan max. 2 topscorers wisselen.' : 'Gouden-wissel-deadline gewist — wisselen staat uit.');
 });
 $('btnOrakelTeamsApi').addEventListener('click', async ()=>{
   if(!isAdmin) return;
