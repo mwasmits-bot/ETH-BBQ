@@ -20,6 +20,7 @@ export default async (req) => {
     const uit = {
       deadline: instellingen.deadline || null,
       deadlineEpoch: instellingen.deadlineEpoch || null,
+      wisselDeadlineEpoch: instellingen.wisselDeadlineEpoch || null,
       gepubliceerd: !!instellingen.gepubliceerd,
       teams: instellingen.teams || [],
       namen: Object.keys(voorspellingen).sort()
@@ -43,7 +44,8 @@ export default async (req) => {
       return Response.json({
         ok: true,
         voorspelling: voorspellingen[naam] || null,
-        deadlineEpoch: instellingen.deadlineEpoch || null
+        deadlineEpoch: instellingen.deadlineEpoch || null,
+        wisselDeadlineEpoch: instellingen.wisselDeadlineEpoch || null
       }, { headers: { "cache-control": "no-store" } });
     }
 
@@ -62,32 +64,58 @@ export default async (req) => {
       return Response.json({ fout: "Onjuist wachtwoord voor deze deelnemer." }, { status: 401 });
     }
     
-    // Deadline controleren
-    if (!instellingen.deadlineEpoch) {
+    // Deadline & fase bepalen
+    const nu = Date.now();
+    const d1 = instellingen.deadlineEpoch;
+    const d2 = instellingen.wisselDeadlineEpoch || null;
+    if (!d1) {
       return Response.json({ fout: "De beheerder heeft nog geen deadline ingesteld." }, { status: 400 });
     }
-    if (Date.now() > instellingen.deadlineEpoch) {
-      return Response.json({ fout: "De deadline is verstreken — het seizoen is begonnen!" }, { status: 403 });
-    }
-    
-    // Teams controleren
-    const teamsLijst = (instellingen.teams || []).map(t => t.naam);
-    if (teamsLijst.length && volgorde.length !== teamsLijst.length) {
-      return Response.json({ fout: "De volgorde bevat niet alle teams." }, { status: 400 });
-    }
-    
-    // Topscorers controleren
-    const schoon = topscorers.slice(0, 3).map(s => String(s).trim()).filter(Boolean);
+
+    const naam = String(deelnemer).trim();
+    const bestaand = voorspellingen[naam];
+    const lc = (x) => String(x).trim().toLowerCase();
+
+    // Topscorers controleren (altijd 3)
+    const schoon = topscorers.slice(0, 3).map(t => String(t).trim()).filter(Boolean);
     if (schoon.length < 3) {
       return Response.json({ fout: "Vul alle drie de topscorers in." }, { status: 400 });
     }
-    
-    // Opslaan
-    voorspellingen[String(deelnemer).trim()] = {
-      volgorde: volgorde.map(String),
-      topscorers: schoon,
-      ingediend: new Date().toISOString()
-    };
+
+    if (nu <= d1) {
+      // FASE 1 - volledige voorspelling (voor de eerste speelronde)
+      const teamsLijst = (instellingen.teams || []).map(t => t.naam);
+      if (teamsLijst.length && volgorde.length !== teamsLijst.length) {
+        return Response.json({ fout: "De volgorde bevat niet alle teams." }, { status: 400 });
+      }
+      voorspellingen[naam] = {
+        volgorde: volgorde.map(String),
+        topscorers: schoon,
+        topscorersBasis: schoon,          // referentie voor de gouden wissels
+        ingediend: new Date().toISOString()
+      };
+    } else if (d2 && nu < d2) {
+      // FASE 2 - gouden wissels (na de 1e speelronde, tot de transferdeadline): alleen topscorers
+      if (!bestaand) {
+        return Response.json({ fout: "Je hebt voor de eerste speelronde geen voorspelling ingediend - meedoen kan niet meer." }, { status: 403 });
+      }
+      const basis = (bestaand.topscorersBasis && bestaand.topscorersBasis.length ? bestaand.topscorersBasis : bestaand.topscorers) || [];
+      const basisLc = new Set(basis.map(lc));
+      const nieuwLc = schoon.map(lc);
+      const behouden = [...basisLc].filter(b => nieuwLc.includes(b)).length;
+      if (behouden < 1) {
+        return Response.json({ fout: "Je mag maximaal 2 gouden wissels doen - minstens 1 van je oorspronkelijke 3 topscorers moet blijven staan." }, { status: 400 });
+      }
+      voorspellingen[naam] = {
+        ...bestaand,
+        topscorers: schoon,               // teamvolgorde blijft ongewijzigd
+        topscorersBasis: basis,           // basis blijft vast
+        gewisseldOp: new Date().toISOString()
+      };
+    } else {
+      return Response.json({ fout: "De deadline is verstreken - voorspellen en wisselen kan niet meer." }, { status: 403 });
+    }
+
     await store.setJSON("orakel", voorspellingen);
     return Response.json({ ok: true });
   }
