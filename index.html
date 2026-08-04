@@ -4139,21 +4139,26 @@ document.addEventListener('click', async (ev)=>{
 function sbToonInlog(){
   const ingelogd = !!sbSessie;
   const velden = $('sbInlogVelden'), banner = $('sbIngelogd');
-  if(velden) velden.classList.toggle('sb-verborgen', ingelogd);
-  if(banner) banner.classList.toggle('sb-verborgen', !ingelogd);
+  // Inline display: de klasse .sb-ingelogd (display:flex) wint anders van .sb-verborgen,
+  // waardoor de groene banner bleef staan na afmelden.
+  if(velden) velden.style.display = ingelogd ? 'none' : 'flex';
+  if(banner) banner.style.display = ingelogd ? 'flex' : 'none';
   if(ingelogd && $('sbIngelogdNaam')) $('sbIngelogdNaam').textContent = sbSessie;
-  if($('sbEigenBunq')) $('sbEigenBunq').classList.toggle('sb-verborgen', !ingelogd);
+  if($('sbEigenBunq')) $('sbEigenBunq').style.display = ingelogd ? '' : 'none';
   if($('sbWw')) $('sbWw').value = '';   // wachtwoordtekens niet laten staan
 }
-if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
-  const naam = $('sbNaam').value;
-  if(!naam){ toonStatus('sbLoginStatus','fout','Kies je naam.'); return; }
-  const team = data.teams[naam];
-  if(team && team.wachtwoord && $('sbWw').value !== team.wachtwoord){
-    toonStatus('sbLoginStatus','fout','Wachtwoord klopt niet.'); return;
+function spelerLogin(){
+  const naam = $('sbNaam') ? $('sbNaam').value : '';
+  if(!naam){ toonStatus('sbLoginStatus','fout','Kies eerst je naam.'); return; }
+  const team = (data.teams || {})[naam];
+  const ingevoerdWw = $('sbWw') ? $('sbWw').value : '';
+  if(team && team.wachtwoord && ingevoerdWw !== team.wachtwoord){
+    toonStatus('sbLoginStatus','fout','❌ Wachtwoord klopt niet — probeer het opnieuw.');
+    if($('sbWw')){ $('sbWw').focus(); $('sbWw').select(); }
+    return;
   }
   sbSessie = naam;
-  sbSessieWw = (team && team.wachtwoord) ? $('sbWw').value : '';
+  sbSessieWw = (team && team.wachtwoord) ? ingevoerdWw : '';
   ethBewaar('eth_speler_naam', naam);
   ethBewaar('eth_speler_ww', ethB64(sbSessieWw || ''));
   ethBewaar('eth_speler_exp', String(Date.now() + 365*864e5));
@@ -4167,7 +4172,10 @@ if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', ()=>{
   if(typeof renderSidebets==='function') renderSidebets();
   if(typeof renderOrakel==='function') renderOrakel();
   toonStatus('sbSessieStatus','info', `Je bent ingelogd als <strong>${esc(naam)}</strong>.`);
-});
+}
+if($('sbAanmelden')) $('sbAanmelden').addEventListener('click', spelerLogin);
+// Enter in het naam- of wachtwoordveld logt ook in (fijn op pc/mac)
+['sbNaam','sbWw'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); spelerLogin(); } }); });
 if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
   sbSessie = null; sbSessieWw = '';
   ethWis('eth_speler_naam','eth_speler_ww','eth_speler_exp');
@@ -4180,6 +4188,8 @@ if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
 });
 
 /* ===== Gedeelde deelnemer-login als pop-up (Orakel + Side Bets) ===== */
+// Zet de aanmeld/afmeld-UI meteen goed bij het laden (groene banner uit als je niet ingelogd bent).
+if(typeof sbToonInlog==='function') sbToonInlog();
 function updateSbWwZichtbaar(){
   const sel=$('sbNaam'); if(!sel) return;
   const team = data.teams && data.teams[sel.value];
