@@ -8,11 +8,14 @@
 // Alle controles gebeuren serverside: een aangepaste frontend kan de regels niet omzeilen.
 import { getStore } from "@netlify/blobs";
 import { meldAdmin } from "./_notify.js";
+import { haalWedstrijd } from "./_football.js";
 
 const MAX_INZET = 100;
 const KEUZES = ["thuis", "gelijk", "uit"];
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, inleg: 10, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null } });
+const leegSuper = () => ({ inleg: 10, potCarry: 0, wedstrijd: null, inzendingen: {}, betaald: {}, afgerond: false, winnaars: null, uitslag: null, geschiedenis: [] });
+
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, inleg: 10, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -32,12 +35,24 @@ export default async (req) => {
     return { ...e, voorspellingen: {}, voorspeldDoor };
   };
 
+  // Super Side Bet: inzendingen blijven verborgen tot de aftrap — ook voor de admin,
+  // die immers ook meespeelt. Pas als de wedstrijd begonnen is (of de ronde is afgerond)
+  // worden ze zichtbaar, voor iedereen tegelijk.
+  const superPubliek = (s) => {
+    if (!s) return s;
+    const ingezondenDoor = Object.keys(s.inzendingen || {});
+    const gestart = !!(s.wedstrijd && new Date(s.wedstrijd.aftrap).getTime() <= Date.now());
+    if (gestart || s.afgerond) return { ...s, ingezondenDoor };
+    return { ...s, inzendingen: {}, ingezondenDoor };
+  };
+
   const laad = async () => {
     const s = await store.get("sidebets", { type: "json" });
     const basis = leegSchema();
     const sb = { ...basis, ...(s || {}) };
     sb.seizoen = { ...basis.seizoen, ...(sb.seizoen || {}) };
     sb.eindstand = { ...basis.eindstand, ...(sb.eindstand || {}) };
+    sb.super = { ...basis.super, ...(sb.super || {}) };
     return sb;
   };
 
@@ -48,6 +63,7 @@ export default async (req) => {
     const { uitbetaal, ...publiek } = sb;
     publiek.heeftUitbetaal = Object.keys(uitbetaal || {});
     publiek.eindstand = eindstandPubliek(publiek.eindstand);
+    publiek.super = superPubliek(publiek.super);
     return Response.json(publiek, { headers: { "cache-control": "no-store" } });
   }
 
@@ -75,7 +91,7 @@ export default async (req) => {
   }
 
   const bewaar = async () => { await store.set("sidebets", JSON.stringify(sb)); };
-  const schoonAntwoord = (o) => { const { uitbetaal, ...p } = o; p.heeftUitbetaal = Object.keys(uitbetaal || {}); p.eindstand = eindstandPubliek(p.eindstand); return p; };
+  const schoonAntwoord = (o) => { const { uitbetaal, ...p } = o; p.heeftUitbetaal = Object.keys(uitbetaal || {}); p.eindstand = eindstandPubliek(p.eindstand); p.super = superPubliek(p.super); return p; };
 
   try {
     // ================= ADMIN-ACTIES =================
@@ -228,6 +244,132 @@ export default async (req) => {
       await bewaar();
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
+
+    // ============= SUPER SIDE BET — ADMIN =============
+    if (["super-instellingen", "super-nieuw", "super-betaald"].includes(body.actie)) {
+      if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
+
+      if (body.actie === "super-instellingen") {
+        if (body.inleg !== undefined) {
+          const n = parseInt(body.inleg, 10);
+          if (Number.isInteger(n) && n >= 1 && n <= 1000) sb.super.inleg = n;
+        }
+      }
+
+      if (body.actie === "super-nieuw") {
+        if (sb.super.wedstrijd && !sb.super.afgerond) {
+          return Response.json({ fout: "Rond eerst de huidige Super Side Bet-ronde af voordat je een nieuwe start." }, { status: 400 });
+        }
+        const { wedstrijd } = body;
+        if (!wedstrijd || !wedstrijd.id || !wedstrijd.aftrap || !wedstrijd.thuis || !wedstrijd.uit) {
+          return Response.json({ fout: "Wedstrijdgegevens ontbreken." }, { status: 400 });
+        }
+        if (new Date(wedstrijd.aftrap).getTime() <= Date.now()) {
+          return Response.json({ fout: "Kies een wedstrijd die nog moet beginnen." }, { status: 400 });
+        }
+        sb.super = {
+          ...leegSuper(),
+          inleg: sb.super.inleg || 10,
+          potCarry: sb.super.potCarry || 0,
+          geschiedenis: sb.super.geschiedenis || [],
+          wedstrijd: { id: wedstrijd.id, thuis: wedstrijd.thuis, uit: wedstrijd.uit, aftrap: wedstrijd.aftrap, speelronde: wedstrijd.speelronde || null }
+        };
+      }
+
+      if (body.actie === "super-betaald") {
+        const naam = String(body.naam || "").trim();
+        if (!naam) return Response.json({ fout: "Geen naam opgegeven." }, { status: 400 });
+        if (body.waarde) sb.super.betaald[naam] = true;
+        else delete sb.super.betaald[naam];
+      }
+
+      await bewaar();
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
+    // ============= SUPER SIDE BET — RONDE AFRONDEN (ADMIN) =============
+    if (body.actie === "super-afronden") {
+      if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
+      const s = sb.super;
+      if (!s.wedstrijd) return Response.json({ fout: "Er is geen actieve Super Side Bet-ronde." }, { status: 400 });
+      if (s.afgerond) return Response.json({ fout: "Deze ronde is al afgerond." }, { status: 400 });
+
+      let live;
+      try {
+        live = await haalWedstrijd(store, s.wedstrijd.speelronde, s.wedstrijd.id);
+      } catch (e) {
+        return Response.json({ fout: "Kon de officiële uitslag niet ophalen: " + (e && e.message || e) }, { status: 502 });
+      }
+      if (!live || live.status !== "FINISHED" || live.thuisDoelpunten == null || live.rustThuisDoelpunten == null) {
+        return Response.json({ fout: "De wedstrijd is nog niet (volledig) afgelopen — ruststand en/of eindstand zijn nog niet bekend." }, { status: 400 });
+      }
+
+      const uitslag = { rustThuis: live.rustThuisDoelpunten, rustUit: live.rustUitDoelpunten, eindThuis: live.thuisDoelpunten, eindUit: live.uitDoelpunten };
+      const betaaldNamen = Object.keys(s.betaald || {}).filter(n => s.betaald[n]);
+      const winnaars = betaaldNamen.filter(n => {
+        const p = s.inzendingen[n];
+        return !!p && p.rustThuis === uitslag.rustThuis && p.rustUit === uitslag.rustUit && p.eindThuis === uitslag.eindThuis && p.eindUit === uitslag.eindUit;
+      });
+      const pot = (s.potCarry || 0) + betaaldNamen.length * s.inleg;
+      const bedragPerWinnaar = winnaars.length ? Math.round((pot / winnaars.length) * 100) / 100 : 0;
+
+      const record = {
+        wedstrijd: s.wedstrijd,
+        inleg: s.inleg,
+        deelnemers: betaaldNamen.length,
+        uitslag,
+        pot,
+        winnaars,
+        bedragPerWinnaar,
+        afgerondOp: new Date().toISOString()
+      };
+
+      sb.super.afgerond = true;
+      sb.super.winnaars = winnaars;
+      sb.super.uitslag = uitslag;
+      sb.super.potCarry = winnaars.length ? 0 : pot;
+      sb.super.geschiedenis = [record, ...(s.geschiedenis || [])].slice(0, 50);
+
+      await bewaar();
+      await meldAdmin(
+        winnaars.length ? `Super Side Bet: ${winnaars.join(" & ")} wint €${pot}` : `Super Side Bet: geen winnaar, pot van €${pot} rolt door`,
+        `${s.wedstrijd.thuis} - ${s.wedstrijd.uit}\nRuststand ${uitslag.rustThuis}-${uitslag.rustUit}, eindstand ${uitslag.eindThuis}-${uitslag.eindUit}\n\n` +
+        (winnaars.length ? `Winnaar(s): ${winnaars.join(", ")} — €${bedragPerWinnaar} per persoon (pot €${pot}).` : `Niemand had het exact goed — de pot van €${pot} rolt door naar de volgende Super Side Bet.`)
+      );
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
+    // ============= SUPER SIDE BET — DEELNEMER =============
+    if (body.actie === "super-voorspel") {
+      const { deelnemer, wachtwoord, rustThuis, rustUit, eindThuis, eindUit } = body;
+      const fout = controleerDeelnemer(deelnemer, wachtwoord);
+      if (fout) return Response.json({ fout }, { status: 401 });
+
+      const s = sb.super;
+      if (!s.wedstrijd) return Response.json({ fout: "Er is nog geen Super Side Bet-ronde geopend." }, { status: 403 });
+      if (s.afgerond) return Response.json({ fout: "Deze ronde is al afgerond — voorspellen kan niet meer." }, { status: 400 });
+      if (new Date(s.wedstrijd.aftrap).getTime() <= Date.now()) {
+        return Response.json({ fout: "De wedstrijd is al begonnen — inzenden kan niet meer." }, { status: 403 });
+      }
+
+      const nrs = [rustThuis, rustUit, eindThuis, eindUit].map(v => parseInt(v, 10));
+      if (!nrs.every(n => Number.isInteger(n) && n >= 0 && n <= 30)) {
+        return Response.json({ fout: "Vul geldige scores in (hele getallen, 0 of hoger)." }, { status: 400 });
+      }
+      const [rt, ru, et, eu] = nrs;
+      if (et < rt || eu < ru) {
+        return Response.json({ fout: "De eindstand kan niet lager zijn dan de ruststand." }, { status: 400 });
+      }
+
+      sb.super.inzendingen[String(deelnemer).trim()] = { rustThuis: rt, rustUit: ru, eindThuis: et, eindUit: eu, ingediend: new Date().toISOString() };
+      await bewaar();
+      await meldAdmin(
+        `Super Side Bet: inzending van ${deelnemer}`,
+        `${deelnemer} heeft een voorspelling ingezonden voor ${s.wedstrijd.thuis} - ${s.wedstrijd.uit}. De inzending zelf blijft verborgen tot de aftrap.`
+      );
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
     // Vrij veld: bunq.me-naam, een betaalverzoek-link (Tikkie/ING/Rabo) of IBAN.
     if (body.actie === "betaalnaam") {
       const { deelnemer, wachtwoord } = body;

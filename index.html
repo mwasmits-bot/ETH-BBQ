@@ -598,6 +598,7 @@
         <button class="knop primair" id="sbNavRonde">📅 Per speelronde</button>
         <button class="knop" id="sbNavOrakel">🔮 Orakel &amp; pot</button>
         <button class="knop" id="sbNavEindstand">🥇 Eindstand</button>
+        <button class="knop" id="sbNavSuper">🎯 Super Side Bet</button>
       </div>
     </div>
 
@@ -640,6 +641,20 @@
         <div id="sbEindstandInhoud"></div>
       </div>
       <div class="card" id="sbEindstandAdmin" style="display:none"></div>
+    </div>
+
+    <!-- Super Side Bet -->
+    <div id="sbViewSuper" style="display:none">
+      <div class="card">
+        <h2>🎯 Super Side Bet</h2>
+        <p class="uitleg">Eén wedstrijd, gekozen door de beheerder — <strong>niet elke week, maar regelmatig</strong>. Voorspel zowel de <strong>ruststand</strong> als de <strong>eindstand</strong> exact goed en je wint de pot.<br><br>
+        ⏱️ <strong>Inzenden kan tot de aftrap</strong> — daarna sluit de inleg, geen uitzonderingen, ook niet voor de beheerder.<br>
+        🙈 Alle voorspellingen blijven <strong>voor iedereen verborgen, ook voor de beheerder</strong> (die zelf ook meespeelt) — pas bij de aftrap worden ze voor iedereen tegelijk zichtbaar.<br>
+        💰 Heeft niemand het exact goed? De pot blijft staan en groeit door bij de volgende Super Side Bet.<br>
+        🤝 Hebben meerdere mensen het exact goed? Dan wordt de pot gelijk verdeeld.</p>
+        <div id="sbSuperInhoud"></div>
+      </div>
+      <div class="card" id="sbSuperAdmin" style="display:none"></div>
     </div>
 
   </section>
@@ -3247,6 +3262,7 @@ async function laadSidebets(){
     const r = await fetch(SB_API, { cache:'no-store' });
     if(r.ok) sbData = await r.json();
   }catch(e){ /* nog geen data */ }
+  await sbSuperWedstrijdLaden();
   sbToonTab();
 }
 
@@ -3578,6 +3594,7 @@ function renderSidebets(){
   renderSbSaldo();
   renderSbSeizoen();
   renderSbEindstand();
+  renderSbSuper();
   sbToonView();
 }
 
@@ -3632,7 +3649,9 @@ function sbAfrekening(){
 }
 function sbAfrekeningTekst(){
   const { uitbetalen, teruggeven, teInnen, bets } = sbAfrekening();
-  if(!bets.length) return null;
+  const superRonde = sbSuper();
+  const heeftSuper = !!superRonde.wedstrijd;
+  if(!bets.length && !heeftSuper) return null;
   const eu = n => '€' + n;
   const ronde = sbRonde ? ('speelronde ' + sbRonde) : 'dit weekend';
   const R = [];
@@ -3671,15 +3690,43 @@ function sbAfrekeningTekst(){
     R.push('');
   }
 
-  R.push('▼ ALLE AFGERONDE BETS');
-  bets.forEach(({ w, a }, i)=>{
-    const m = sbWedstrijdVan(w.matchId);
-    const uit = (m && m.status === 'FINISHED') ? ' (' + m.thuisDoelpunten + '–' + m.uitDoelpunten + ')' : '';
-    const res = a.terug ? 'niemand goed — inzet terug' : (a.winnaar + ' wint ' + eu(w.inzet * 2));
-    R.push((i+1) + '. ' + w.thuis + '–' + w.uit + uit + ': '
-      + w.uitdager + ' (' + SB_LABEL[w.keuzeUitdager] + ') vs '
-      + w.tegenstander + ' (' + SB_LABEL[w.keuzeTegenstander] + ') → ' + res);
-  });
+  if(bets.length){
+    R.push('▼ ALLE AFGERONDE BETS');
+    bets.forEach(({ w, a }, i)=>{
+      const m = sbWedstrijdVan(w.matchId);
+      const uit = (m && m.status === 'FINISHED') ? ' (' + m.thuisDoelpunten + '–' + m.uitDoelpunten + ')' : '';
+      const res = a.terug ? 'niemand goed — inzet terug' : (a.winnaar + ' wint ' + eu(w.inzet * 2));
+      R.push((i+1) + '. ' + w.thuis + '–' + w.uit + uit + ': '
+        + w.uitdager + ' (' + SB_LABEL[w.keuzeUitdager] + ') vs '
+        + w.tegenstander + ' (' + SB_LABEL[w.keuzeTegenstander] + ') → ' + res);
+    });
+    R.push('');
+  }
+
+  if(heeftSuper){
+    const s = superRonde;
+    R.push('▼ SUPER SIDE BET');
+    R.push(s.wedstrijd.thuis + '–' + s.wedstrijd.uit + ' (aftrap ' + sbFmt(s.wedstrijd.aftrap) + ')');
+    const betaaldNamen = Object.keys(s.betaald||{}).filter(n=>s.betaald[n]);
+    const pot = sbSuperPotHuidig(s);
+    if(s.afgerond){
+      const rec = (s.geschiedenis && s.geschiedenis[0]) || null;
+      R.push('Uitslag: ruststand ' + s.uitslag.rustThuis + '-' + s.uitslag.rustUit + ', eindstand ' + s.uitslag.eindThuis + '-' + s.uitslag.eindUit);
+      if(s.winnaars && s.winnaars.length){
+        R.push('Winnaar' + (s.winnaars.length>1?'s':'') + ': ' + s.winnaars.join(', ') + ' — ' + eu(rec?rec.bedragPerWinnaar:pot) + (s.winnaars.length>1?' per persoon':'') + ' (pot ' + eu(rec?rec.pot:pot) + ')');
+      } else {
+        R.push('Niemand had het goed — de pot van ' + eu(rec?rec.pot:pot) + ' rolt door naar de volgende Super Side Bet.');
+      }
+    } else {
+      R.push('Pot tot nu toe: ' + eu(pot) + ' (' + betaaldNamen.length + ' betaald)');
+      const nogNiet = (s.ingezondenDoor || Object.keys(s.inzendingen||{})).filter(n=>!betaaldNamen.includes(n));
+      if(nogNiet.length) R.push('Nog te innen van: ' + nogNiet.join(', '));
+      const gestart = new Date(s.wedstrijd.aftrap).getTime() <= Date.now();
+      if(gestart) R.push('Wedstrijd is bezig of afgelopen — rond de ronde af in het beheerpaneel zodra de uitslag bekend is.');
+    }
+    R.push('');
+  }
+
   return R.join('\n');
 }
 if($('sbAfrekenMail')) $('sbAfrekenMail').addEventListener('click', async ()=>{
@@ -3708,16 +3755,19 @@ if($('sbAfrekenMail')) $('sbAfrekenMail').addEventListener('click', async ()=>{
 let sbView = 'ronde';
 function sbToonView(){
   document.querySelectorAll('.sb-ronde-view').forEach(el=> el.style.display = (sbView==='ronde') ? '' : 'none');
-  const vo=$('sbViewOrakel'), ve=$('sbViewEindstand');
+  const vo=$('sbViewOrakel'), ve=$('sbViewEindstand'), vs=$('sbViewSuper');
   if(vo) vo.style.display = (sbView==='orakel') ? '' : 'none';
   if(ve) ve.style.display = (sbView==='eindstand') ? '' : 'none';
+  if(vs) vs.style.display = (sbView==='super') ? '' : 'none';
   if($('sbNavRonde'))     $('sbNavRonde').classList.toggle('primair', sbView==='ronde');
   if($('sbNavOrakel'))    $('sbNavOrakel').classList.toggle('primair', sbView==='orakel');
   if($('sbNavEindstand')) $('sbNavEindstand').classList.toggle('primair', sbView==='eindstand');
+  if($('sbNavSuper'))     $('sbNavSuper').classList.toggle('primair', sbView==='super');
 }
 if($('sbNavRonde'))     $('sbNavRonde').addEventListener('click', ()=>{ sbView='ronde'; sbToonView(); });
 if($('sbNavOrakel'))    $('sbNavOrakel').addEventListener('click', ()=>{ sbView='orakel'; sbSyncOrakelSessie(); sbToonView(); if(typeof laadEigenOrakel==='function') laadEigenOrakel(); });
 if($('sbNavEindstand')) $('sbNavEindstand').addEventListener('click', ()=>{ sbView='eindstand'; sbToonView(); });
+if($('sbNavSuper'))     $('sbNavSuper').addEventListener('click', async ()=>{ sbView='super'; await sbSuperWedstrijdLaden(); sbToonView(); renderSbSuper(); });
 
 function sbSeizoen(){ return sbData.seizoen || { actief:false, inleg:20, aangemeld:{}, betaald:{}, winnaar:null }; }
 function sbOrakelNamen(){
@@ -4063,6 +4113,221 @@ document.addEventListener('click', (ev)=>{
     if(!k||!l){ melding('fout','Kies zowel kampioen als laatste.'); return; }
     if(k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; }
     actie({actie:'eindstand-voorspel', deelnemer:sbSessie, wachtwoord:sbSessieWw, kampioen:k, laatste:l}, 'Voorspelling opgeslagen.');
+  }
+});
+
+/* =============== Super Side Bet =============== */
+const sbFmt = iso => new Date(iso).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
+function sbSuper(){ return sbData.super || { inleg:10, potCarry:0, wedstrijd:null, inzendingen:{}, betaald:{}, afgerond:false, winnaars:null, uitslag:null, geschiedenis:[], ingezondenDoor:[] }; }
+function sbSuperPotHuidig(s){
+  const betaaldNamen = Object.keys(s.betaald||{}).filter(n=>s.betaald[n]);
+  return (s.potCarry||0) + betaaldNamen.length * (s.inleg||0);
+}
+
+// Live wedstrijdgegevens voor de gekozen Super Side Bet-wedstrijd — apart opgehaald,
+// want die kan in een andere speelronde zitten dan die je op "Per speelronde" bekijkt.
+let sbSuperWed = null;
+async function sbSuperWedstrijdLaden(){
+  const s = sbSuper();
+  if(!s.wedstrijd){ sbSuperWed = null; return; }
+  try{
+    const q = s.wedstrijd.speelronde ? ('?ronde='+s.wedstrijd.speelronde) : '';
+    const r = await fetch(SB_WED_API+q, { cache:'no-store' });
+    if(r.ok){
+      const d = await r.json();
+      sbSuperWed = (d.wedstrijden||[]).find(w=> String(w.id)===String(s.wedstrijd.id)) || null;
+    }
+  }catch(e){ /* stil */ }
+}
+
+function sbSuperLiveWinnaars(s, w){
+  if(!w || w.status!=='FINISHED' || w.rustThuisDoelpunten==null || w.thuisDoelpunten==null) return null;
+  const betaaldNamen = Object.keys(s.betaald||{}).filter(n=>s.betaald[n]);
+  const inz = s.inzendingen || {};
+  return betaaldNamen.filter(n=>{
+    const p = inz[n]; if(!p) return false;
+    return p.rustThuis===w.rustThuisDoelpunten && p.rustUit===w.rustUitDoelpunten && p.eindThuis===w.thuisDoelpunten && p.eindUit===w.uitDoelpunten;
+  });
+}
+
+function sbSuperGeschiedenisHtml(s){
+  const rijen = s.geschiedenis.slice(0,10).map(g=>{
+    const res = g.winnaars && g.winnaars.length
+      ? `${g.winnaars.map(esc).join(' &amp; ')} won${g.winnaars.length>1?'nen':''} €${g.bedragPerWinnaar}${g.winnaars.length>1?' p.p.':''}`
+      : 'niemand — pot rolt door';
+    return `<tr><td>${esc(g.wedstrijd.thuis)}–${esc(g.wedstrijd.uit)}</td><td>${g.uitslag.rustThuis}-${g.uitslag.rustUit} / ${g.uitslag.eindThuis}-${g.uitslag.eindUit}</td><td>€${g.pot}</td><td>${res}</td></tr>`;
+  }).join('');
+  return `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Eerdere Super Side Bets</h3><table class="stand"><tr><th>Wedstrijd</th><th>Rust / eind</th><th>Pot</th><th>Resultaat</th></tr>${rijen}</table></div>`;
+}
+
+function renderSbSuper(){
+  const houder = $('sbSuperInhoud');
+  if(!houder) return;
+  const s = sbSuper();
+  renderSbSuperAdmin();
+
+  if(!s.wedstrijd){
+    houder.innerHTML = '<div class="leeg">Er is nog geen Super Side Bet geopend door de beheerder.</div>'
+      + ((s.geschiedenis && s.geschiedenis.length) ? sbSuperGeschiedenisHtml(s) : '');
+    return;
+  }
+
+  const gestart = new Date(s.wedstrijd.aftrap).getTime() <= Date.now();
+  const pot = sbSuperPotHuidig(s);
+  const ingezondenDoor = s.ingezondenDoor || Object.keys(s.inzendingen||{});
+  const betaaldNamen = Object.keys(s.betaald||{}).filter(n=>s.betaald[n]);
+  const w = sbSuperWed;
+
+  let html = `<div class="sb-pot">
+    <div class="sb-pot-label">De pot${s.potCarry?(' — incl. €'+s.potCarry+' meegenomen van de vorige ronde'):''}</div>
+    <div class="sb-pot-bedrag">€${pot}</div>
+    <div class="sb-pot-sub">${betaaldNamen.length} deelnemer${betaaldNamen.length===1?'':'s'} · inleg €${s.inleg} p.p. · exacte ruststand + eindstand wint</div>
+  </div>`;
+
+  html += `<div class="card" style="margin-top:12px">
+    <strong>${esc(w?w.thuis:s.wedstrijd.thuis)} — ${esc(w?w.uit:s.wedstrijd.uit)}</strong>
+    <div style="margin-top:4px;color:var(--chalk-dim);font-size:14px">Aftrap: ${sbFmt(s.wedstrijd.aftrap)}${gestart?' — begonnen, inzenden is gesloten':''}</div>
+  </div>`;
+
+  if(s.afgerond){
+    const uit = s.uitslag;
+    const rec = (s.geschiedenis && s.geschiedenis[0]) || null;
+    if(s.winnaars && s.winnaars.length){
+      html += `<div class="card" style="border-left:3px solid #a3e635;margin-top:12px">
+        <strong style="color:#a3e635">🏆 ${s.winnaars.map(n=>esc(n)).join(' &amp; ')} ${s.winnaars.length>1?'delen':'wint'} de pot van €${rec?rec.pot:pot}${(s.winnaars.length>1 && rec) ? (' — €'+rec.bedragPerWinnaar+' per persoon'):''}</strong>
+        <div style="margin-top:4px;color:var(--chalk-dim);font-size:14px">Ruststand ${uit.rustThuis}-${uit.rustUit}, eindstand ${uit.eindThuis}-${uit.eindUit}</div>
+      </div>`;
+    } else {
+      html += `<div class="card" style="border-left:3px solid var(--chalk-dim);margin-top:12px">
+        <strong>Niemand had de ruststand én eindstand exact goed.</strong>
+        <div style="margin-top:4px;color:var(--chalk-dim);font-size:14px">Ruststand ${uit.rustThuis}-${uit.rustUit}, eindstand ${uit.eindThuis}-${uit.eindUit} — de pot van €${rec?rec.pot:pot} blijft staan voor de volgende Super Side Bet.</div>
+      </div>`;
+    }
+  } else if(w && w.status==='FINISHED'){
+    const live = sbSuperLiveWinnaars(s, w);
+    html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">De wedstrijd is afgelopen (ruststand ${w.rustThuisDoelpunten}-${w.rustUitDoelpunten}, eindstand ${w.thuisDoelpunten}-${w.uitDoelpunten}). ${(live && live.length) ? ('Winnaar: '+live.map(esc).join(' &amp; ')+' — wacht op bevestiging door de beheerder.') : 'Nog niemand had het exact goed — wacht op bevestiging door de beheerder.'}</p></div>`;
+  }
+
+  if(sbSessie){
+    const heeftIngezonden = ingezondenDoor.includes(sbSessie);
+    const isBetaald = betaaldNamen.includes(sbSessie);
+    if(gestart || s.afgerond){
+      const mijn = (s.inzendingen||{})[sbSessie];
+      if(mijn) html += `<div class="card" style="margin-top:12px"><strong>Jouw voorspelling</strong><div style="margin-top:4px">Ruststand ${mijn.rustThuis}-${mijn.rustUit}, eindstand ${mijn.eindThuis}-${mijn.eindUit}</div></div>`;
+    } else {
+      html += `<div class="card" style="margin-top:12px">
+        <strong>Jouw voorspelling</strong>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+          <div><label style="font-size:13px;color:var(--chalk-dim)">Ruststand — ${esc(w?w.thuis:s.wedstrijd.thuis)} vs ${esc(w?w.uit:s.wedstrijd.uit)}</label><br>
+            <input type="number" min="0" max="30" id="ssRustThuis" style="width:60px"> - <input type="number" min="0" max="30" id="ssRustUit" style="width:60px">
+          </div>
+          <div><label style="font-size:13px;color:var(--chalk-dim)">Eindstand</label><br>
+            <input type="number" min="0" max="30" id="ssEindThuis" style="width:60px"> - <input type="number" min="0" max="30" id="ssEindUit" style="width:60px">
+          </div>
+          <button class="knop primair" data-super-voorspel="1" style="align-self:flex-end">Voorspelling opslaan</button>
+        </div>
+        ${heeftIngezonden ? '<div style="margin-top:8px;color:#a3e635;font-size:14px">✓ Je hebt een voorspelling opgeslagen (verborgen tot de aftrap). Opnieuw opslaan overschrijft je vorige keuze.</div>' : ''}
+      </div>`;
+      if(!isBetaald){
+        const link = sbBunqLink(s.inleg, `SuperSideBet ${s.wedstrijd.thuis}-${s.wedstrijd.uit} ${sbSessie}`);
+        html += `<div class="card" style="margin-top:12px">
+          <strong>💶 Meedoen — €${s.inleg} inleg</strong>
+          <p class="uitleg" style="margin:6px 0 9px">Betaal de inleg om mee te dingen naar de pot. Vergeet niet ook je voorspelling hierboven op te slaan.</p>
+          ${link ? `<a class="knop primair" href="${link}" target="_blank" rel="noopener" style="text-decoration:none">💶 Betaal €${s.inleg} inleg</a>` : '<span class="uitleg">De beheerder heeft nog geen bunq.me-naam ingesteld — maak het bedrag over aan de beheerder.</span>'}
+        </div>`;
+      } else {
+        html += `<div class="card" style="margin-top:12px"><strong style="color:#a3e635">✅ Je inleg is bevestigd — je doet mee om de pot.</strong></div>`;
+      }
+    }
+  } else {
+    html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">Meld je aan onder “Wie ben je?” om mee te doen.</p></div>`;
+  }
+
+  html += `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Wie doet mee (${betaaldNamen.length})</h3>`;
+  if(gestart || s.afgerond){
+    const inz = s.inzendingen || {};
+    const namen = Object.keys(inz).sort();
+    html += namen.length
+      ? `<table class="stand"><tr><th>Deelnemer</th><th>Ruststand</th><th>Eindstand</th></tr>`
+        + namen.map(n=>`<tr><td>${esc(n)}${betaaldNamen.includes(n)?'':' <span style="color:var(--chalk-dim);font-size:12px">(inleg niet bevestigd)</span>'}</td><td>${inz[n].rustThuis}-${inz[n].rustUit}</td><td>${inz[n].eindThuis}-${inz[n].eindUit}</td></tr>`).join('')
+        + `</table>`
+      : '<div class="leeg">Niemand heeft voorspeld.</div>';
+  } else {
+    html += ingezondenDoor.length
+      ? `<div>${ingezondenDoor.map(n=>`${esc(n)} ${betaaldNamen.includes(n)?'✅':'⏳'}`).join(' · ')}</div><p class="uitleg" style="margin:8px 0 0">✅ = inleg betaald, ⏳ = nog niet. Voorspellingen blijven verborgen tot de aftrap.</p>`
+      : '<div class="leeg">Nog niemand heeft voorspeld.</div>';
+  }
+  html += `</div>`;
+
+  if(s.geschiedenis && s.geschiedenis.length) html += sbSuperGeschiedenisHtml(s);
+
+  houder.innerHTML = html;
+}
+
+function renderSbSuperAdmin(){
+  const el = $('sbSuperAdmin');
+  if(!el) return;
+  if(!isAdmin){ el.style.display='none'; return; }
+  el.style.display='';
+  const s = sbSuper();
+  const kanNieuw = !s.wedstrijd || s.afgerond;
+  const wedOpties = (sbWed.wedstrijden||[]).filter(m=> new Date(m.aftrap).getTime() > Date.now())
+    .map(m=>`<div class="sb-adminrij"><span>${esc(m.thuis)} – ${esc(m.uit)} <span style="color:var(--chalk-dim);font-size:12px">(${sbFmt(m.aftrap)})</span></span><button class="knop" data-super-kies='${JSON.stringify({id:m.id,thuis:m.thuis,uit:m.uit,aftrap:m.aftrap,speelronde:sbRonde}).replace(/'/g,"&#39;")}'>Kies</button></div>`).join('');
+
+  const namenLijst = s.ingezondenDoor || Object.keys(s.inzendingen||{});
+  const betaaldRijen = namenLijst.length
+    ? namenLijst.map(n=>{ const paid=!!(s.betaald||{})[n];
+        return `<div class="sb-adminrij"><span>${esc(n)}</span><button class="knop" data-super-betaald="${esc(n)}" data-waarde="${paid?0:1}">${paid?'✓ inleg betaald':'○ nog niet'}</button></div>`; }).join('')
+    : '<div class="leeg">Nog niemand heeft voorspeld.</div>';
+
+  el.innerHTML = `
+    <h2>Super Side Bet — beheer</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:6px;color:var(--chalk-dim);font-size:14px">inleg €<input id="ssInleg" type="number" min="1" max="1000" value="${s.inleg||10}" style="width:70px"></label>
+      <button class="knop" data-super-inleg="1">Inleg opslaan</button>
+      ${s.potCarry ? `<span style="color:var(--chalk-dim);font-size:14px">Meegenomen pot: €${s.potCarry}</span>` : ''}
+    </div>
+    ${s.wedstrijd && !s.afgerond ? `
+      <h3 style="margin:6px 0">Huidige ronde</h3>
+      <p class="uitleg" style="margin-top:0">${esc(s.wedstrijd.thuis)} – ${esc(s.wedstrijd.uit)} (${sbFmt(s.wedstrijd.aftrap)})</p>
+      <h4 style="margin:10px 0 4px">Inleg betaald</h4>
+      <div class="sb-adminlijst">${betaaldRijen}</div>
+      <div style="margin-top:10px"><button class="knop primair" data-super-afronden="1">🏁 Ronde afronden (na afloop wedstrijd)</button></div>
+      <p class="uitleg" style="margin:6px 0 0">Haalt de officiële ruststand en eindstand op en verwerkt de pot. Kan pas zodra de wedstrijd is afgelopen.</p>
+    ` : ''}
+    ${kanNieuw ? `
+      <h3 style="margin:16px 0 6px">Nieuwe ronde starten</h3>
+      <p class="uitleg" style="margin-top:0">Kies een wedstrijd uit de speelronde die nu op “Per speelronde” getoond wordt (gebruik ‹ vorige / volgende › daar om een andere speelronde te tonen).</p>
+      <div class="sb-adminlijst">${wedOpties || '<div class="leeg">Geen komende wedstrijden gevonden in deze speelronde.</div>'}</div>
+    ` : '<p class="uitleg" style="margin-top:16px">Rond eerst de huidige ronde af voordat je een nieuwe start.</p>'}
+    <div class="status" id="sbSuperStatus"></div>`;
+}
+
+document.addEventListener('click', (ev)=>{
+  const t = ev.target.closest('button');
+  if(!t) return;
+  const melding = (soort,msg)=> toonStatus($('sbSuperStatus')?'sbSuperStatus':'sbSessieStatus', soort, msg);
+  const actie = async (payload, ok)=>{ try{ await sbPost(payload); await sbSuperWedstrijdLaden(); renderSidebets(); if(ok) melding('info', ok); }catch(e){ melding('fout', e.message); } };
+
+  if(t.dataset.superInleg){
+    const v = parseInt($('ssInleg').value,10)||10;
+    actie({actie:'super-instellingen', inleg:v}, 'Inleg opgeslagen.');
+  } else if(t.dataset.superKies){
+    const m = JSON.parse(t.dataset.superKies);
+    if(!confirm(`Super Side Bet openen voor ${m.thuis} – ${m.uit}?`)) return;
+    actie({actie:'super-nieuw', wedstrijd:m}, 'Nieuwe ronde geopend.');
+  } else if(t.dataset.superBetaald){
+    actie({actie:'super-betaald', naam:t.dataset.superBetaald, waarde:t.dataset.waarde==='1'}, 'Bijgewerkt.');
+  } else if(t.dataset.superAfronden){
+    if(!confirm('Ronde afronden? Dit haalt de officiële uitslag op en verwerkt de pot definitief.')) return;
+    actie({actie:'super-afronden'}, 'Ronde afgerond.');
+  } else if(t.dataset.superVoorspel){
+    if(!sbSessie){ melding('fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
+    const rt=parseInt($('ssRustThuis').value,10), ru=parseInt($('ssRustUit').value,10), et=parseInt($('ssEindThuis').value,10), eu=parseInt($('ssEindUit').value,10);
+    if(![rt,ru,et,eu].every(n=>Number.isInteger(n) && n>=0)){ melding('fout','Vul alle vier de scores in (hele getallen, 0 of hoger).'); return; }
+    if(et<rt || eu<ru){ melding('fout','De eindstand kan niet lager zijn dan de ruststand.'); return; }
+    if(!confirm(`Voorspelling opslaan: ruststand ${rt}-${ru}, eindstand ${et}-${eu}?`)) return;
+    actie({actie:'super-voorspel', deelnemer:sbSessie, wachtwoord:sbSessieWw, rustThuis:rt, rustUit:ru, eindThuis:et, eindUit:eu}, 'Voorspelling opgeslagen.');
   }
 });
 
