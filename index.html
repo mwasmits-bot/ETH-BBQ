@@ -423,7 +423,7 @@
     <div class="card">
       <h2>🔮 Het Eredivisie Orakel</h2>
       <p class="uitleg">Voorspel de <strong>volledige eindstand</strong> van de eredivisie én je <strong>top 3 topscorers</strong>. Puntentelling: 3 punten per team op exact de juiste plek, 1 punt als je er één plek naast zit, <strong>+5 bonus voor de juiste kampioen</strong>, en <strong>2 punten voor elk doelpunt van een getipte topscorer</strong> (alle drie tellen mee — hun volledige seizoenstotaal).<br><br>
-      <strong>Let op — twee deadlines:</strong> je volledige voorspelling (eindstand + topscorers) sluit bij de <strong>aftrap van de 1e speelronde</strong>. Daarna wordt er nog volop getransferd — de Nederlandse transfermarkt sluit pas op <strong>2 september</strong>. Tot die transferdeadline krijg je daarom <strong>2 gouden wissels</strong>: je mag dan maximaal 2 van je 3 topscorers vervangen, nooit alle 3 (minstens 1 origineel blijft staan). Je teamvolgorde ligt na de 1e speelronde vast. Wissel je een topscorer, dan telt gewoon het volledige seizoenstotaal van je huidige 3 topscorers.</p>
+      <span id="orakelUitlegDeadlines"></span></p>
       <div class="status info zichtbaar" id="orakelDeadlineInfo" style="margin-top:0">Deadline wordt geladen…</div>
       <div id="orakelFormulier" style="display:none">
         <div class="rondekop" id="orakelLoginRow" style="display:none">
@@ -2551,6 +2551,18 @@ function renderOrakel(){
   else if(fase==='voorspellen'){ deadlineInfo.innerHTML = '⏳ Voorspellen kan nog ' + rester(d1) + ' (tot ' + fmt(d1) + ')'; }
   else if(fase==='wissel'){ deadlineInfo.innerHTML = '🔁 Je volledige voorspelling staat vast. Je kunt je topscorers nog aanpassen met <strong>max. 2 gouden wissels</strong>, nog ' + rester(d2) + ' (tot ' + fmt(d2) + ').'; }
   else { deadlineInfo.textContent = '🔒 Gesloten — voorspellen en wisselen kan niet meer. Bekijk hieronder de stand.'; }
+
+  // Handleiding-alinea dynamisch: toon de datums die de beheerder heeft ingesteld.
+  const uitlegEl = $('orakelUitlegDeadlines');
+  if(uitlegEl){
+    if(!d1){
+      uitlegEl.innerHTML = 'De beheerder stelt de deadline(s) nog in — daarna verschijnen ze hier.';
+    } else if(d2 && d2 > d1){
+      uitlegEl.innerHTML = '<strong>Twee deadlines:</strong> je volledige voorspelling (eindstand + topscorers) sluit op <strong>' + fmt(d1) + '</strong> — de aftrap van de 1e speelronde. Daarna mag je je topscorers nog aanpassen met <strong>2 gouden wissels</strong> tot <strong>' + fmt(d2) + '</strong> (de transferdeadline): maximaal 2 van je 3 vervangen, nooit alle 3 (minstens 1 origineel blijft staan). Je teamvolgorde ligt na de 1e speelronde vast. Wissel je een topscorer, dan telt gewoon het volledige seizoenstotaal van je huidige 3 topscorers.';
+    } else {
+      uitlegEl.innerHTML = '<strong>Deadline:</strong> je voorspelling (eindstand + topscorers) sluit op <strong>' + fmt(d1) + '</strong> — de aftrap van de 1e speelronde. Daarna ligt alles vast; er zijn geen gouden wissels.';
+    }
+  }
 
   const formOpen = (fase==='voorspellen' || fase==='wissel') && teams.length;
   $('orakelFormulier').style.display = formOpen ? 'block' : 'none';
