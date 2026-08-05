@@ -7,6 +7,7 @@
 // Deelnemers schrijven met hun eigen wachtwoord (uit data.teams), admin met ADMIN_WACHTWOORD.
 // Alle controles gebeuren serverside: een aangepaste frontend kan de regels niet omzeilen.
 import { getStore } from "@netlify/blobs";
+import { meldAdmin } from "./_notify.js";
 
 const MAX_INZET = 100;
 const KEUZES = ["thuis", "gelijk", "uit"];
@@ -305,6 +306,10 @@ export default async (req) => {
       });
 
       await bewaar();
+      await meldAdmin(
+        `Side bet: nieuwe uitdaging van ${deelnemer}`,
+        `${deelnemer} heeft €${bedrag} ingezet op "${keuze}" bij ${wedstrijd.thuis} - ${wedstrijd.uit}.`
+      );
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
@@ -335,6 +340,10 @@ export default async (req) => {
       w.gematchtOp = new Date().toISOString();
 
       await bewaar();
+      await meldAdmin(
+        `Side bet: ${deelnemer} haakt aan bij ${w.uitdager}`,
+        `${deelnemer} heeft de uitdaging van ${w.uitdager} (€${w.inzet}, ${w.thuis} - ${w.uit}) aangenomen met keuze "${keuze}".`
+      );
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 

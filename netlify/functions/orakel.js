@@ -6,6 +6,7 @@
 // - Voorspellingen van anderen zijn pas zichtbaar als de admin publiceert.
 // - De admin (met x-wachtwoord) ziet altijd alles.
 import { getStore } from "@netlify/blobs";
+import { meldAdmin } from "./_notify.js";
 
 export default async (req) => {
   const store = getStore("eth-scorito-bbq");
@@ -82,6 +83,7 @@ export default async (req) => {
       return Response.json({ fout: "Vul alle drie de topscorers in." }, { status: 400 });
     }
 
+    let melding;
     if (nu <= d1) {
       // FASE 1 - volledige voorspelling (voor de eerste speelronde)
       const teamsLijst = (instellingen.teams || []).map(t => t.naam);
@@ -94,6 +96,7 @@ export default async (req) => {
         topscorersBasis: schoon,          // referentie voor de gouden wissels
         ingediend: new Date().toISOString()
       };
+      melding = { onderwerp: `Orakel: nieuwe voorspelling van ${naam}`, tekst: `${naam} heeft zijn/haar Eredivisie Orakel-voorspelling ingediend.\n\nVolgorde: ${volgorde.join(", ")}\nTopscorers: ${schoon.join(", ")}` };
     } else if (d2 && nu < d2) {
       // FASE 2 - gouden wissels (na de 1e speelronde, tot de transferdeadline): alleen topscorers
       if (!bestaand) {
@@ -112,11 +115,13 @@ export default async (req) => {
         topscorersBasis: basis,           // basis blijft vast
         gewisseldOp: new Date().toISOString()
       };
+      melding = { onderwerp: `Orakel: gouden wissel van ${naam}`, tekst: `${naam} heeft een gouden wissel gedaan bij het Eredivisie Orakel.\n\nNieuwe topscorers: ${schoon.join(", ")}` };
     } else {
       return Response.json({ fout: "De deadline is verstreken - voorspellen en wisselen kan niet meer." }, { status: 403 });
     }
 
     await store.setJSON("orakel", voorspellingen);
+    await meldAdmin(melding.onderwerp, melding.tekst);
     return Response.json({ ok: true });
   }
 
