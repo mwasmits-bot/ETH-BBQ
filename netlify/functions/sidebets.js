@@ -26,13 +26,13 @@ export default async (req) => {
   const isAdmin = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
-  // Eindstand-picks (Scorito King) pas tonen als de uitslag vaststaat — ook niet aan de admin,
-  // die zelf ook meespeelt. Net als bij Super Side Bet: iedereen ziet alleen wíe heeft ingevuld.
+  // Eindstand-picks (Scorito King) pas tonen aan andere spelers als de uitslag vaststaat
+  // (of aan de admin) — voorkomt afkijken. Net als bij het Orakel.
   const eindstandPubliek = (e) => {
     if (!e) return e;
     const voorspeldDoor = Object.keys(e.voorspellingen || {});
     const locked = !!(e.kampioen && e.laatste);
-    if (locked) return { ...e, voorspeldDoor };
+    if (isAdmin || locked) return { ...e, voorspeldDoor };
     return { ...e, voorspellingen: {}, voorspeldDoor };
   };
 
