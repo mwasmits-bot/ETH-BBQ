@@ -26,14 +26,12 @@ export default async (req) => {
   const isAdmin = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
-  // Eindstand-picks (Scorito King) pas tonen aan andere spelers als de uitslag vaststaat
-  // (of aan de admin) — voorkomt afkijken. Net als bij het Orakel.
+  // Scorito King-picks gewoon meesturen (net als bij de rest van Side Bets) — spelers moeten
+  // altijd betrouwbaar hun eigen ingevulde voorspelling terugzien, ook vóór de uitslag.
   const eindstandPubliek = (e) => {
     if (!e) return e;
     const voorspeldDoor = Object.keys(e.voorspellingen || {});
-    const locked = !!(e.kampioen && e.laatste);
-    if (isAdmin || locked) return { ...e, voorspeldDoor };
-    return { ...e, voorspellingen: {}, voorspeldDoor };
+    return { ...e, voorspeldDoor };
   };
 
   // Super Side Bet: inzendingen blijven verborgen tot de aftrap — ook voor de admin,
@@ -272,25 +270,6 @@ export default async (req) => {
       sb.eindstand.voorspellingen[String(deelnemer).trim()] = { kampioen: k, laatste: l, kampioenPunten: kp, laatstePunten: lp };
       await bewaar();
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
-    }
-
-    // Eigen Scorito King-voorspelling ophalen (ook vóór de deadline/uitslag), zodat een
-    // ingelogde deelnemer ziet wat hij invulde en het tot de deadline kan aanpassen.
-    // Bewust geen isAdmin-uitzondering hier (anders zou de admin via deze route alsnog
-    // andermans gok kunnen opvragen) — wie de voorspelling wil zien moet het bijbehorende
-    // wachtwoord kennen, net als bij het Orakel.
-    if (body.actie === "eindstand-mijn") {
-      const naam = String(body.deelnemer || "").trim();
-      const team = teams[naam];
-      if (!naam || !team) return Response.json({ fout: "Deelnemer niet gevonden." }, { status: 400 });
-      if (team.wachtwoord && String(body.wachtwoord || "") !== team.wachtwoord) {
-        return Response.json({ fout: "Onjuist wachtwoord voor deze deelnemer." }, { status: 401 });
-      }
-      return Response.json({
-        ok: true,
-        voorspelling: sb.eindstand.voorspellingen[naam] || null,
-        betaald: !!(sb.eindstand.betaald || {})[naam]
-      }, { headers: { "cache-control": "no-store" } });
     }
 
     // ============= SUPER SIDE BET — ADMIN =============
