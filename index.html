@@ -3999,7 +3999,7 @@ function renderSbEindstand(){
   const voorspeldDoor = e.voorspeldDoor || Object.keys(e.voorspellingen || {});
   const pot = inleg * betaaldNamen.length;
   const stand = sbEindstandStand();
-  const gesloten = !!(e.kampioen || e.laatste);
+  const gesloten = !!(e.kampioen && e.laatste);
   const deadlineVerstreken = !!(e.deadlineEpoch && Date.now() >= e.deadlineEpoch);
 
   renderSbEindstandAdmin();
@@ -4151,7 +4151,15 @@ document.addEventListener('click', (ev)=>{
   }
   else if(t.dataset.eindstandKandidaten){ const ks=[...document.querySelectorAll('.es-kand:checked')].map(c=>c.value); actie({actie:'eindstand-instellingen', kandidaten:ks}, 'Kandidaten opgeslagen ('+ks.length+').'); }
   else if(t.dataset.eindstandBetaald){ actie({actie:'eindstand-betaald', naam:t.dataset.eindstandBetaald, waarde:t.dataset.waarde==='1'}, 'Bijgewerkt.'); }
-  else if(t.dataset.eindstandUitslag){ const k=$('esUitKampioen').value, l=$('esUitLaatste').value; if(k&&l&&k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; } actie({actie:'eindstand-uitslag', kampioen:k||null, laatste:l||null}, 'Uitslag vastgelegd.'); }
+  else if(t.dataset.eindstandUitslag){
+    const k=$('esUitKampioen').value, l=$('esUitLaatste').value;
+    if(k && l && k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; }
+    if((k && !l) || (l && !k)){ melding('fout','Vul zowel kampioen als laatste in, of laat beide leeg om te wissen.'); return; }
+    if(k && l){
+      if(!confirm(`Uitslag vastleggen: kampioen ${k}, laatste ${l}? Dit sluit Scorito King definitief af — doe dit pas als de Scorito-competitie echt is afgelopen.`)) return;
+    }
+    actie({actie:'eindstand-uitslag', kampioen:k||null, laatste:l||null}, (k&&l) ? 'Uitslag vastgelegd.' : 'Uitslag gewist.');
+  }
   else if(t.dataset.eindstandVoorspel){
     if(!sbSessie){ melding('fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
     const k=$('skKampioen').value, l=$('skLaatste').value;

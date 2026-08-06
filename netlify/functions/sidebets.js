@@ -26,12 +26,13 @@ export default async (req) => {
   const isAdmin = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
-  // Eindstand-picks pas tonen als de uitslag vaststaat (of aan de admin) — voorkomt afkijken.
+  // Eindstand-picks (Scorito King) pas tonen als de uitslag vaststaat — ook niet aan de admin,
+  // die zelf ook meespeelt. Net als bij Super Side Bet: iedereen ziet alleen wíe heeft ingevuld.
   const eindstandPubliek = (e) => {
     if (!e) return e;
     const voorspeldDoor = Object.keys(e.voorspellingen || {});
     const locked = !!(e.kampioen && e.laatste);
-    if (isAdmin || locked) return { ...e, voorspeldDoor };
+    if (locked) return { ...e, voorspeldDoor };
     return { ...e, voorspellingen: {}, voorspeldDoor };
   };
 
@@ -220,6 +221,9 @@ export default async (req) => {
         const l = body.laatste ? String(body.laatste).trim() : null;
         if (k && !kand.includes(k)) return Response.json({ fout: "Kampioen staat niet in de kandidatenlijst." }, { status: 400 });
         if (l && !kand.includes(l)) return Response.json({ fout: "Laatste staat niet in de kandidatenlijst." }, { status: 400 });
+        if ((k && !l) || (l && !k)) {
+          return Response.json({ fout: "Vul zowel kampioen als laatste in, of laat beide leeg om de uitslag te wissen." }, { status: 400 });
+        }
         sb.eindstand.kampioen = k;
         sb.eindstand.laatste = l;
       }
