@@ -3963,6 +3963,30 @@ document.addEventListener('click', (ev)=>{
 /* =============== Scorito King (kampioen + bbq-loser, met puntengok) =============== */
 const skFmt = iso => new Date(iso).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
 function sbEindstand(){ return sbData.eindstand || { actief:false, deadlineEpoch:null, inleg:10, naamBonus:50, kandidaten:[], voorspellingen:{}, betaald:{}, voorspeldDoor:[], kampioen:null, laatste:null }; }
+
+/* Haalt de eigen ingediende Scorito King-voorspelling op (ook vóór de deadline/uitslag) en
+   houdt 'm bij in skMijn, zodat een ingelogde deelnemer ziet wat hij invulde en het tot de
+   deadline kan wijzigen — zelfde methodiek als laadEigenOrakel. */
+let skMijn = null;
+let skEigenGeladenVoor = null;
+async function laadEigenEindstand(force){
+  if(typeof sbSessie === 'undefined' || !sbSessie) return;
+  if(!force && skEigenGeladenVoor === sbSessie) return;
+  const e = sbEindstand();
+  if(!e.deadlineEpoch || (e.kampioen && e.laatste)) return;   // niets te halen: nog niet open, of al afgerond
+  if(Date.now() >= e.deadlineEpoch) return;                    // deadline voorbij -> formulier toch niet zichtbaar
+  try{
+    const r = await fetch(SB_API, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ actie:'eindstand-mijn', deelnemer:sbSessie, wachtwoord:sbSessieWw })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) return;
+    skEigenGeladenVoor = sbSessie;
+    skMijn = j.voorspelling || null;
+    renderSbEindstand();
+  }catch(e){ /* stil */ }
+}
 // Echte eindpuntentotalen komen uit de eigen Scorito-stand van de app (Totaalklassement) — niemand hoeft ze over te typen.
 function skWerkelijkePunten(naam){
   const { totaal } = tellingen();
@@ -4028,9 +4052,10 @@ function renderSbEindstand(){
   }
 
   if(sbSessie){
-    const mijn = (e.voorspellingen || {})[sbSessie];
+    const mijn = skMijn;
     const heeftVoorspeld = voorspeldDoor.includes(sbSessie);
     const isBetaald = !!(e.betaald || {})[sbSessie];
+    if(!gesloten && !deadlineVerstreken) laadEigenEindstand();
     if(gesloten){
       html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">De uitslag is bekend — voorspellen kan niet meer.${heeftVoorspeld?'':' Je hebt niet meegedaan.'}</p></div>`;
     } else if(deadlineVerstreken){
@@ -4167,6 +4192,7 @@ document.addEventListener('click', (ev)=>{
     if(!k||!l){ melding('fout','Kies zowel kampioen als laatste.'); return; }
     if(k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; }
     if(!Number.isInteger(kp)||kp<0||!Number.isInteger(lp)||lp<0){ melding('fout','Vul voor beiden een gegokt puntenaantal in (0 of hoger).'); return; }
+    skEigenGeladenVoor = null;   // forceert een verse ophaal van "mijn" na het opslaan
     actie({actie:'eindstand-voorspel', deelnemer:sbSessie, wachtwoord:sbSessieWw, kampioen:k, laatste:l, kampioenPunten:kp, laatstePunten:lp}, 'Voorspelling opgeslagen.');
   }
 });
@@ -4500,6 +4526,8 @@ function spelerLogin(){
   sbSyncOrakelSessie();
   orakelEigenGeladenVoor = null;
   if(typeof laadEigenOrakel==='function') laadEigenOrakel(true);
+  skEigenGeladenVoor = null;
+  if(typeof laadEigenEindstand==='function') laadEigenEindstand(true);
   if(typeof sbHaalUitbetaal==='function') sbHaalUitbetaal();
   if(typeof renderSidebets==='function') renderSidebets();
   if(typeof renderOrakel==='function') renderOrakel();
@@ -4512,6 +4540,7 @@ if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
   sbSessie = null; sbSessieWw = '';
   ethWis('eth_speler_naam','eth_speler_ww','eth_speler_exp');
   orakelEigenGeladenVoor = null;
+  skEigenGeladenVoor = null; skMijn = null;
   sbToonInlog();
   sbSyncOrakelSessie();
   verbergStatus('sbSessieStatus');

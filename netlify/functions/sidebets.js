@@ -268,6 +268,25 @@ export default async (req) => {
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
+    // Eigen Scorito King-voorspelling ophalen (ook vóór de deadline/uitslag), zodat een
+    // ingelogde deelnemer ziet wat hij invulde en het tot de deadline kan aanpassen.
+    // Bewust geen isAdmin-uitzondering hier (anders zou de admin via deze route alsnog
+    // andermans gok kunnen opvragen) — wie de voorspelling wil zien moet het bijbehorende
+    // wachtwoord kennen, net als bij het Orakel.
+    if (body.actie === "eindstand-mijn") {
+      const naam = String(body.deelnemer || "").trim();
+      const team = teams[naam];
+      if (!naam || !team) return Response.json({ fout: "Deelnemer niet gevonden." }, { status: 400 });
+      if (team.wachtwoord && String(body.wachtwoord || "") !== team.wachtwoord) {
+        return Response.json({ fout: "Onjuist wachtwoord voor deze deelnemer." }, { status: 401 });
+      }
+      return Response.json({
+        ok: true,
+        voorspelling: sb.eindstand.voorspellingen[naam] || null,
+        betaald: !!(sb.eindstand.betaald || {})[naam]
+      }, { headers: { "cache-control": "no-store" } });
+    }
+
     // ============= SUPER SIDE BET — ADMIN =============
     if (["super-instellingen", "super-nieuw", "super-betaald"].includes(body.actie)) {
       if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
