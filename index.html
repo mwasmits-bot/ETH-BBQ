@@ -597,7 +597,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="knop primair" id="sbNavRonde">📅 Per speelronde</button>
         <button class="knop" id="sbNavOrakel">🔮 Orakel &amp; pot</button>
-        <button class="knop" id="sbNavEindstand">🥇 Eindstand</button>
+        <button class="knop" id="sbNavEindstand">👑 Scorito King</button>
         <button class="knop" id="sbNavSuper">🎯 Super Side Bet</button>
       </div>
     </div>
@@ -633,11 +633,11 @@
       <div class="card" id="sbSeizoenAdmin" style="display:none"></div>
     </div>
 
-    <!-- Eindstand-bet -->
+    <!-- Scorito King (voorheen Eindstand-bet) -->
     <div id="sbViewEindstand" style="display:none">
       <div class="card">
-        <h2>🥇 Eindstand — Kampioen &amp; bbq-loser</h2>
-        <p class="uitleg">Voorspel wie de poule wint (kampioen) én wie laatste wordt (de bbq-loser). Aparte pot met eigen inleg: je scoort een punt per goede voorspelling, de meeste punten wint de pot — bij gelijk verdelen. Voorspellingen blijven verborgen tot de uitslag bekend is.</p>
+        <h2>👑 Scorito King — Kampioen &amp; bbq-loser</h2>
+        <p class="uitleg">Voorspel wie de poule wint (kampioen) én wie laatste wordt (de bbq-loser) — én met hoeveel punten. Aparte pot met eigen inleg. Puntentelling: de juiste naam levert een flinke bonus op, maar ook als je de naam mist tellen minpunten mee voor hoe dicht je bij het echte puntenaantal zat — dus reken tot de laatste speelronde mee. Hoogste score wint de pot, bij gelijke stand wordt gedeeld. Voorspellingen (inclusief puntengok) blijven voor iedereen verborgen tot de uitslag bekend is.</p>
         <div id="sbEindstandInhoud"></div>
       </div>
       <div class="card" id="sbEindstandAdmin" style="display:none"></div>
@@ -3960,18 +3960,30 @@ document.addEventListener('click', (ev)=>{
   }
 });
 
-/* =============== eindstand-bet (kampioen + bbq-loser) =============== */
-function sbEindstand(){ return sbData.eindstand || { actief:false, inleg:10, kandidaten:[], voorspellingen:{}, betaald:{}, voorspeldDoor:[], kampioen:null, laatste:null }; }
+/* =============== Scorito King (kampioen + bbq-loser, met puntengok) =============== */
+const skFmt = iso => new Date(iso).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
+function sbEindstand(){ return sbData.eindstand || { deadlineEpoch:null, inleg:10, naamBonus:50, kandidaten:[], voorspellingen:{}, betaald:{}, voorspeldDoor:[], kampioen:null, laatste:null }; }
+// Echte eindpuntentotalen komen uit de eigen Scorito-stand van de app (Totaalklassement) — niemand hoeft ze over te typen.
+function skWerkelijkePunten(naam){
+  const { totaal } = tellingen();
+  return totaal[naam] ?? null;
+}
 function sbEindstandStand(){
   const e = sbEindstand();
   if(!e.kampioen || !e.laatste) return null;
+  const werkKamp = skWerkelijkePunten(e.kampioen);
+  const werkLaat = skWerkelijkePunten(e.laatste);
+  const bonus = e.naamBonus ?? 50;
   const betaald = e.betaald || {};
   return Object.keys(e.voorspellingen || {})
     .filter(n => betaald[n])
     .map(n => {
       const v = e.voorspellingen[n] || {};
-      const pt = (v.kampioen===e.kampioen?1:0) + (v.laatste===e.laatste?1:0);
-      return { naam:n, kampioen:v.kampioen, laatste:v.laatste, punten:pt };
+      const verschilKamp = (werkKamp!=null && v.kampioenPunten!=null) ? Math.abs(v.kampioenPunten - werkKamp) : null;
+      const verschilLaat = (werkLaat!=null && v.laatstePunten!=null) ? Math.abs(v.laatstePunten - werkLaat) : null;
+      const puntenKamp = (v.kampioen===e.kampioen ? bonus : 0) - (verschilKamp ?? 0);
+      const puntenLaat = (v.laatste===e.laatste ? bonus : 0) - (verschilLaat ?? 0);
+      return { naam:n, kampioen:v.kampioen, laatste:v.laatste, kampioenPunten:v.kampioenPunten, laatstePunten:v.laatstePunten, verschilKamp, verschilLaat, punten: puntenKamp + puntenLaat };
     })
     .sort((a,b)=> b.punten-a.punten || a.naam.localeCompare(b.naam,'nl'));
 }
@@ -3981,29 +3993,37 @@ function renderSbEindstand(){
   if(!houder) return;
   const e = sbEindstand();
   const inleg = e.inleg || 10;
+  const bonus = e.naamBonus ?? 50;
   const kand = e.kandidaten || [];
   const betaaldNamen = Object.keys(e.betaald || {}).filter(n => e.betaald[n]);
   const voorspeldDoor = e.voorspeldDoor || Object.keys(e.voorspellingen || {});
   const pot = inleg * betaaldNamen.length;
   const stand = sbEindstandStand();
+  const gesloten = !!(e.kampioen || e.laatste);
+  const deadlineVerstreken = !!(e.deadlineEpoch && Date.now() >= e.deadlineEpoch);
 
   renderSbEindstandAdmin();
 
-  if(!e.actief && !isAdmin){ houder.innerHTML = '<div class="leeg">De eindstand-bet is nog niet geopend door de beheerder.</div>'; return; }
-  if(!kand.length){ houder.innerHTML = '<div class="leeg">De beheerder heeft nog geen kandidaten geselecteerd.</div>'; return; }
+  const uitlegDeadline = e.deadlineEpoch
+    ? `<strong>Deadline:</strong> je voorspelling (kampioen, laatste én hun puntenaantal) sluit op <strong>${skFmt(e.deadlineEpoch)}</strong>. Daarna ligt alles vast.`
+    : 'De beheerder heeft nog geen deadline ingesteld.';
+  houder.innerHTML = `<p class="uitleg" id="skDeadlineUitleg" style="margin-top:0">${uitlegDeadline}</p>`;
+
+  if(!e.deadlineEpoch && !isAdmin){ houder.innerHTML += '<div class="leeg">Scorito King is nog niet geopend door de beheerder.</div>'; return; }
+  if(!kand.length){ houder.innerHTML += '<div class="leeg">De beheerder heeft nog geen kandidaten geselecteerd.</div>'; return; }
 
   let html = `<div class="sb-pot">
     <div class="sb-pot-label">De pot — inleg €${inleg} p.p.</div>
     <div class="sb-pot-bedrag">€${pot}</div>
-    <div class="sb-pot-sub">${betaaldNamen.length} in de running · meeste punten wint (bij gelijk verdelen)</div>
+    <div class="sb-pot-sub">${betaaldNamen.length} in de running · hoogste score wint (bij gelijk verdelen)</div>
   </div>`;
 
   if(stand){
     const max = stand.length ? stand[0].punten : 0;
     const winnaars = stand.filter(r => r.punten===max);
     html += `<div class="card" style="border-left:3px solid #a3e635;margin-top:12px">
-      <strong style="color:#a3e635">🏆 ${winnaars.map(w=>esc(w.naam)).join(' & ') || 'niemand'} ${winnaars.length>1?'delen':'wint'} de pot van €${pot}</strong>
-      <div style="margin-top:4px;color:var(--chalk-dim);font-size:14px">Uitslag: kampioen <strong>${esc(e.kampioen)}</strong>, bbq-loser <strong>${esc(e.laatste)}</strong></div>
+      <strong style="color:#a3e635">👑 ${winnaars.map(w=>esc(w.naam)).join(' & ') || 'niemand'} ${winnaars.length>1?'delen':'wint'} de pot van €${pot}</strong>
+      <div style="margin-top:4px;color:var(--chalk-dim);font-size:14px">Uitslag: kampioen <strong>${esc(e.kampioen)}</strong> (${skWerkelijkePunten(e.kampioen) ?? '?'} punten), bbq-loser <strong>${esc(e.laatste)}</strong> (${skWerkelijkePunten(e.laatste) ?? '?'} punten)</div>
     </div>`;
   }
 
@@ -4011,22 +4031,25 @@ function renderSbEindstand(){
     const mijn = (e.voorspellingen || {})[sbSessie];
     const heeftVoorspeld = voorspeldDoor.includes(sbSessie);
     const isBetaald = !!(e.betaald || {})[sbSessie];
-    const gesloten = !!(e.kampioen || e.laatste);
     if(gesloten){
       html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">De uitslag is bekend — voorspellen kan niet meer.${heeftVoorspeld?'':' Je hebt niet meegedaan.'}</p></div>`;
+    } else if(deadlineVerstreken){
+      html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">De deadline is verstreken — voorspellen kan niet meer.${heeftVoorspeld?'':' Je hebt niet meegedaan.'}</p></div>`;
     } else {
       const opt = (sel) => '<option value="">— kies —</option>' + kand.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('');
       html += `<div class="card" style="margin-top:12px">
         <strong>Jouw voorspelling</strong>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">
-          <div><label style="font-size:13px;color:var(--chalk-dim)">🏆 Kampioen</label><br><select id="esKampioen">${opt(mijn?mijn.kampioen:'')}</select></div>
-          <div><label style="font-size:13px;color:var(--chalk-dim)">🍖 Laatste (bbq-loser)</label><br><select id="esLaatste">${opt(mijn?mijn.laatste:'')}</select></div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">
+          <div><label style="font-size:13px;color:var(--chalk-dim)">👑 Kampioen</label><br><select id="skKampioen">${opt(mijn?mijn.kampioen:'')}</select></div>
+          <div><label style="font-size:13px;color:var(--chalk-dim)">Met hoeveel punten?</label><br><input type="number" min="0" max="20000" id="skKampioenPunten" style="width:90px" value="${mijn&&mijn.kampioenPunten!=null?mijn.kampioenPunten:''}"></div>
+          <div><label style="font-size:13px;color:var(--chalk-dim)">🍖 Laatste (bbq-loser)</label><br><select id="skLaatste">${opt(mijn?mijn.laatste:'')}</select></div>
+          <div><label style="font-size:13px;color:var(--chalk-dim)">Met hoeveel punten?</label><br><input type="number" min="0" max="20000" id="skLaatstePunten" style="width:90px" value="${mijn&&mijn.laatstePunten!=null?mijn.laatstePunten:''}"></div>
           <button class="knop primair" data-eindstand-voorspel="1">Voorspelling bewaren</button>
         </div>
-        ${heeftVoorspeld ? '<div style="margin-top:8px;color:#a3e635;font-size:14px">✓ Je voorspelling is opgeslagen'+(mijn?` — kampioen ${esc(mijn.kampioen)}, laatste ${esc(mijn.laatste)}`:'')+'.</div>' : ''}
+        ${heeftVoorspeld ? '<div style="margin-top:8px;color:#a3e635;font-size:14px">✓ Je voorspelling is opgeslagen'+(mijn?` — kampioen ${esc(mijn.kampioen)} (${mijn.kampioenPunten} pt), laatste ${esc(mijn.laatste)} (${mijn.laatstePunten} pt)`:'')+'.</div>' : ''}
       </div>`;
       if(!isBetaald){
-        const link = sbBunqLink(inleg, `Eindstand-inleg ${sbSessie}`);
+        const link = sbBunqLink(inleg, `ScoritoKing-inleg ${sbSessie}`);
         const knop = link
           ? `<a class="knop primair" href="${link}" target="_blank" rel="noopener" style="text-decoration:none">💶 Betaal €${inleg} inleg</a>`
           : `<span class="uitleg">De beheerder heeft nog geen bunq.me-naam ingesteld — maak €${inleg} over aan de beheerder.</span>`;
@@ -4045,16 +4068,16 @@ function renderSbEindstand(){
 
   html += `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Wie doet mee (${betaaldNamen.length})</h3>`;
   if(stand){
-    html += `<table class="stand"><tr><th></th><th>Deelnemer</th><th>Kampioen</th><th>Laatste</th><th style="text-align:right">Punten</th></tr>`
-      + stand.map((r,i)=>`<tr class="${i===0?'p1':''}"><td class="pos">${i+1}</td><td>${esc(r.naam)}</td><td>${esc(r.kampioen)}</td><td>${esc(r.laatste)}</td><td class="num">${r.punten}</td></tr>`).join('')
-      + `</table>`;
+    html += `<table class="stand"><tr><th></th><th>Deelnemer</th><th>Kampioen</th><th>Laatste</th><th style="text-align:right">Score</th></tr>`
+      + stand.map((r,i)=>`<tr class="${i===0?'p1':''}"><td class="pos">${i+1}</td><td>${esc(r.naam)}</td><td>${esc(r.kampioen)} (${r.kampioenPunten}${r.verschilKamp!=null?', Δ'+r.verschilKamp:''})</td><td>${esc(r.laatste)} (${r.laatstePunten}${r.verschilLaat!=null?', Δ'+r.verschilLaat:''})</td><td class="num">${r.punten}</td></tr>`).join('')
+      + `</table><p class="uitleg" style="margin:8px 0 0">Score = ${bonus} punten bij de juiste naam, min het verschil (Δ) tussen je gegokte en het echte puntenaantal — voor kampioen én laatste apart.</p>`;
   } else {
     const lijst = voorspeldDoor.map(n => `${esc(n)} ${betaaldNamen.includes(n)?'✅':'⏳'}`).join(' · ');
     html += voorspeldDoor.length ? `<div>${lijst}</div><p class="uitleg" style="margin:8px 0 0">✅ = inleg betaald, ⏳ = nog niet. Voorspellingen blijven verborgen tot de uitslag bekend is.</p>` : '<div class="leeg">Nog niemand heeft voorspeld.</div>';
   }
   html += `</div>`;
 
-  houder.innerHTML = html;
+  houder.innerHTML += html;
 }
 
 function renderSbEindstandAdmin(){
@@ -4064,6 +4087,7 @@ function renderSbEindstandAdmin(){
   el.style.display='';
   const e = sbEindstand();
   const inleg = e.inleg || 10;
+  const bonus = e.naamBonus ?? 50;
   const kand = e.kandidaten || [];
   const alle = alleDeelnemers();
   const voorspeldDoor = e.voorspeldDoor || Object.keys(e.voorspellingen || {});
@@ -4075,13 +4099,21 @@ function renderSbEindstandAdmin(){
         return `<div class="sb-adminrij"><span>${esc(n)}</span><button class="knop" data-eindstand-betaald="${esc(n)}" data-waarde="${paid?0:1}">${paid?'✓ inleg betaald':'○ nog niet'}</button></div>`; }).join('')
     : '<div class="leeg">Nog niemand heeft voorspeld.</div>';
   const opt = (sel) => '<option value="">— kies —</option>' + kand.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('');
+  const deadlineLokaal = e.deadlineEpoch ? new Date(e.deadlineEpoch - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
   el.innerHTML = `
-    <h2>Eindstand-bet — beheer</h2>
+    <h2>Scorito King — beheer</h2>
+    <h3 style="margin:6px 0">Deadline</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-      <button class="knop" data-eindstand-toggle="1">${e.actief?'🔓 Open — klik om te sluiten':'🔒 Gesloten — klik om te openen'}</button>
+      <input type="datetime-local" id="skDeadline" value="${deadlineLokaal}">
+      <button class="knop" data-eindstand-deadline="1">Deadline opslaan</button>
+    </div>
+    <h3 style="margin:6px 0">Inleg &amp; puntenbonus</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:6px;color:var(--chalk-dim);font-size:14px">inleg €<input id="esInleg" type="number" min="1" value="${inleg}" style="width:70px"></label>
+      <label style="display:flex;align-items:center;gap:6px;color:var(--chalk-dim);font-size:14px">bonus juiste naam<input id="skNaamBonus" type="number" min="0" value="${bonus}" style="width:80px"> punten</label>
       <button class="knop" data-eindstand-inleg="1">Opslaan</button>
     </div>
+    <p class="uitleg" style="margin-top:0">De bonus bepaalt hoe zwaar de juiste naam weegt tegenover het dichtbij zitten met het puntenaantal. Voel je na een paar seizoenen dat het niet balanceert (bijv. omdat puntentotalen bij jullie heel hoog of laag liggen), verhoog of verlaag hem dan gewoon.</p>
     <h3 style="margin:6px 0">Kandidaten <span style="font-weight:400;color:var(--chalk-dim);font-size:14px">(wie kan kampioen/laatste worden)</span></h3>
     <p class="uitleg" style="margin-top:0">Vink de Scorito-deelnemers aan die meedoen. Alleen deze zijn selecteerbaar.</p>
     <div class="es-checks">${checks}</div>
@@ -4089,8 +4121,9 @@ function renderSbEindstandAdmin(){
     <h3 style="margin:16px 0 6px">Inleg betaald</h3>
     <div class="sb-adminlijst">${paidRijen}</div>
     <h3 style="margin:16px 0 6px">Uitslag vastleggen</h3>
+    <p class="uitleg" style="margin-top:0">Het puntenaantal van de kampioen/laatste zelf hoef je niet in te vullen — dat haalt de app live uit het Totaalklassement.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-      <div><label style="font-size:13px;color:var(--chalk-dim)">🏆 Kampioen</label><br><select id="esUitKampioen">${opt(e.kampioen||'')}</select></div>
+      <div><label style="font-size:13px;color:var(--chalk-dim)">👑 Kampioen</label><br><select id="esUitKampioen">${opt(e.kampioen||'')}</select></div>
       <div><label style="font-size:13px;color:var(--chalk-dim)">🍖 Laatste</label><br><select id="esUitLaatste">${opt(e.laatste||'')}</select></div>
       <button class="knop primair" data-eindstand-uitslag="1">Vastleggen</button>
     </div>
@@ -4102,17 +4135,27 @@ document.addEventListener('click', (ev)=>{
   if(!t) return;
   const melding = (soort,msg)=> toonStatus($('sbEindstandStatus')?'sbEindstandStatus':'sbSessieStatus', soort, msg);
   const actie = async (payload, ok)=>{ try{ await sbPost(payload); renderSidebets(); if(ok) melding('info', ok); }catch(e){ melding('fout', e.message); } };
-  if(t.dataset.eindstandToggle){ actie({actie:'eindstand-instellingen', actief:!sbEindstand().actief}, 'Opgeslagen.'); }
-  else if(t.dataset.eindstandInleg){ const v=parseInt($('esInleg').value,10)||10; actie({actie:'eindstand-instellingen', inleg:v}, 'Inleg opgeslagen.'); }
+  if(t.dataset.eindstandDeadline){
+    const v = $('skDeadline').value;
+    const epoch = v ? new Date(v).getTime() : null;
+    actie({actie:'eindstand-instellingen', deadlineEpoch: epoch}, epoch ? 'Deadline opgeslagen.' : 'Deadline gewist.');
+  }
+  else if(t.dataset.eindstandInleg){
+    const v=parseInt($('esInleg').value,10)||10;
+    const b=parseInt($('skNaamBonus').value,10);
+    actie({actie:'eindstand-instellingen', inleg:v, naamBonus: Number.isInteger(b)?b:undefined}, 'Opgeslagen.');
+  }
   else if(t.dataset.eindstandKandidaten){ const ks=[...document.querySelectorAll('.es-kand:checked')].map(c=>c.value); actie({actie:'eindstand-instellingen', kandidaten:ks}, 'Kandidaten opgeslagen ('+ks.length+').'); }
   else if(t.dataset.eindstandBetaald){ actie({actie:'eindstand-betaald', naam:t.dataset.eindstandBetaald, waarde:t.dataset.waarde==='1'}, 'Bijgewerkt.'); }
   else if(t.dataset.eindstandUitslag){ const k=$('esUitKampioen').value, l=$('esUitLaatste').value; if(k&&l&&k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; } actie({actie:'eindstand-uitslag', kampioen:k||null, laatste:l||null}, 'Uitslag vastgelegd.'); }
   else if(t.dataset.eindstandVoorspel){
     if(!sbSessie){ melding('fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
-    const k=$('esKampioen').value, l=$('esLaatste').value;
+    const k=$('skKampioen').value, l=$('skLaatste').value;
+    const kp=parseInt($('skKampioenPunten').value,10), lp=parseInt($('skLaatstePunten').value,10);
     if(!k||!l){ melding('fout','Kies zowel kampioen als laatste.'); return; }
     if(k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; }
-    actie({actie:'eindstand-voorspel', deelnemer:sbSessie, wachtwoord:sbSessieWw, kampioen:k, laatste:l}, 'Voorspelling opgeslagen.');
+    if(!Number.isInteger(kp)||kp<0||!Number.isInteger(lp)||lp<0){ melding('fout','Vul voor beiden een gegokt puntenaantal in (0 of hoger).'); return; }
+    actie({actie:'eindstand-voorspel', deelnemer:sbSessie, wachtwoord:sbSessieWw, kampioen:k, laatste:l, kampioenPunten:kp, laatstePunten:lp}, 'Voorspelling opgeslagen.');
   }
 });
 

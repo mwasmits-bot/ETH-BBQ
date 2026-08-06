@@ -15,7 +15,7 @@ const KEUZES = ["thuis", "gelijk", "uit"];
 
 const leegSuper = () => ({ inleg: 10, potCarry: 0, wedstrijd: null, inzendingen: {}, betaald: {}, afgerond: false, winnaars: null, uitslag: null, geschiedenis: [] });
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, inleg: 10, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -189,10 +189,17 @@ export default async (req) => {
       if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
 
       if (body.actie === "eindstand-instellingen") {
-        if (typeof body.actief === "boolean") sb.eindstand.actief = body.actief;
+        if (body.deadlineEpoch !== undefined) {
+          const d = body.deadlineEpoch === null ? null : Number(body.deadlineEpoch);
+          if (d === null || Number.isFinite(d)) sb.eindstand.deadlineEpoch = d;
+        }
         if (body.inleg !== undefined) {
           const n = parseInt(body.inleg, 10);
           if (Number.isInteger(n) && n >= 1 && n <= 1000) sb.eindstand.inleg = n;
+        }
+        if (body.naamBonus !== undefined) {
+          const n = parseInt(body.naamBonus, 10);
+          if (Number.isInteger(n) && n >= 0 && n <= 10000) sb.eindstand.naamBonus = n;
         }
         if (Array.isArray(body.kandidaten)) {
           sb.eindstand.kandidaten = body.kandidaten.map(x => String(x).trim()).filter(Boolean).slice(0, 64);
@@ -220,13 +227,16 @@ export default async (req) => {
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
-    // ============= EINDSTAND — DEELNEMER =============
+    // ============= EINDSTAND / SCORITO KING — DEELNEMER =============
     if (body.actie === "eindstand-voorspel") {
-      const { deelnemer, wachtwoord, kampioen, laatste } = body;
+      const { deelnemer, wachtwoord, kampioen, laatste, kampioenPunten, laatstePunten } = body;
       const fout = controleerDeelnemer(deelnemer, wachtwoord);
       if (fout) return Response.json({ fout }, { status: 401 });
-      if (!sb.eindstand.actief && !isAdmin) {
-        return Response.json({ fout: "De eindstand-bet staat nog niet open." }, { status: 403 });
+      if (!sb.eindstand.deadlineEpoch) {
+        return Response.json({ fout: "De beheerder heeft nog geen deadline ingesteld." }, { status: 403 });
+      }
+      if (Date.now() >= sb.eindstand.deadlineEpoch) {
+        return Response.json({ fout: "De deadline is verstreken — voorspellen kan niet meer." }, { status: 403 });
       }
       if ((sb.eindstand.kampioen || sb.eindstand.laatste) && !isAdmin) {
         return Response.json({ fout: "De uitslag is al bekend — voorspellen kan niet meer." }, { status: 400 });
@@ -240,7 +250,12 @@ export default async (req) => {
       if (k === l) {
         return Response.json({ fout: "Kampioen en laatste moeten verschillende deelnemers zijn." }, { status: 400 });
       }
-      sb.eindstand.voorspellingen[String(deelnemer).trim()] = { kampioen: k, laatste: l };
+      const kp = parseInt(kampioenPunten, 10);
+      const lp = parseInt(laatstePunten, 10);
+      if (!Number.isInteger(kp) || kp < 0 || kp > 20000 || !Number.isInteger(lp) || lp < 0 || lp > 20000) {
+        return Response.json({ fout: "Vul een geldig gegokt puntenaantal in voor zowel de kampioen als de laatste." }, { status: 400 });
+      }
+      sb.eindstand.voorspellingen[String(deelnemer).trim()] = { kampioen: k, laatste: l, kampioenPunten: kp, laatstePunten: lp };
       await bewaar();
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
