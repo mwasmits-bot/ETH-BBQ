@@ -3962,7 +3962,7 @@ document.addEventListener('click', (ev)=>{
 
 /* =============== Scorito King (kampioen + bbq-loser, met puntengok) =============== */
 const skFmt = iso => new Date(iso).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
-function sbEindstand(){ return sbData.eindstand || { deadlineEpoch:null, inleg:10, naamBonus:50, kandidaten:[], voorspellingen:{}, betaald:{}, voorspeldDoor:[], kampioen:null, laatste:null }; }
+function sbEindstand(){ return sbData.eindstand || { actief:false, deadlineEpoch:null, inleg:10, naamBonus:50, kandidaten:[], voorspellingen:{}, betaald:{}, voorspeldDoor:[], kampioen:null, laatste:null }; }
 // Echte eindpuntentotalen komen uit de eigen Scorito-stand van de app (Totaalklassement) — niemand hoeft ze over te typen.
 function skWerkelijkePunten(naam){
   const { totaal } = tellingen();
@@ -4009,7 +4009,7 @@ function renderSbEindstand(){
     : 'De beheerder heeft nog geen deadline ingesteld.';
   houder.innerHTML = `<p class="uitleg" id="skDeadlineUitleg" style="margin-top:0">${uitlegDeadline}</p>`;
 
-  if(!e.deadlineEpoch && !isAdmin){ houder.innerHTML += '<div class="leeg">Scorito King is nog niet geopend door de beheerder.</div>'; return; }
+  if(!e.actief && !isAdmin){ houder.innerHTML += '<div class="leeg">Scorito King is nog niet geopend door de beheerder.</div>'; return; }
   if(!kand.length){ houder.innerHTML += '<div class="leeg">De beheerder heeft nog geen kandidaten geselecteerd.</div>'; return; }
 
   let html = `<div class="sb-pot">
@@ -4102,10 +4102,13 @@ function renderSbEindstandAdmin(){
   const deadlineLokaal = e.deadlineEpoch ? new Date(e.deadlineEpoch - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
   el.innerHTML = `
     <h2>Scorito King — beheer</h2>
+    <div style="margin-bottom:12px">
+      <button class="knop" data-eindstand-toggle="1">${e.actief?'🔓 Open — klik om te sluiten':'🔒 Gesloten — klik om te openen'}</button>
+    </div>
     <h3 style="margin:6px 0">Deadline</h3>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-      <input type="datetime-local" id="skDeadline" value="${deadlineLokaal}">
-      <button class="knop" data-eindstand-deadline="1">Deadline opslaan</button>
+    <div class="rondekop">
+      <input type="datetime-local" id="skDeadline" value="${deadlineLokaal}" style="max-width:240px;background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px">
+      <button class="actie mini" data-eindstand-deadline="1">Deadline opslaan</button>
     </div>
     <h3 style="margin:6px 0">Inleg &amp; puntenbonus</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
@@ -4135,7 +4138,8 @@ document.addEventListener('click', (ev)=>{
   if(!t) return;
   const melding = (soort,msg)=> toonStatus($('sbEindstandStatus')?'sbEindstandStatus':'sbSessieStatus', soort, msg);
   const actie = async (payload, ok)=>{ try{ await sbPost(payload); renderSidebets(); if(ok) melding('info', ok); }catch(e){ melding('fout', e.message); } };
-  if(t.dataset.eindstandDeadline){
+  if(t.dataset.eindstandToggle){ actie({actie:'eindstand-instellingen', actief:!sbEindstand().actief}, 'Opgeslagen.'); }
+  else if(t.dataset.eindstandDeadline){
     const v = $('skDeadline').value;
     const epoch = v ? new Date(v).getTime() : null;
     actie({actie:'eindstand-instellingen', deadlineEpoch: epoch}, epoch ? 'Deadline opgeslagen.' : 'Deadline gewist.');

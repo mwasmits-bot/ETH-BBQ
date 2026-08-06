@@ -15,7 +15,7 @@ const KEUZES = ["thuis", "gelijk", "uit"];
 
 const leegSuper = () => ({ inleg: 10, potCarry: 0, wedstrijd: null, inzendingen: {}, betaald: {}, afgerond: false, winnaars: null, uitslag: null, geschiedenis: [] });
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -189,6 +189,7 @@ export default async (req) => {
       if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
 
       if (body.actie === "eindstand-instellingen") {
+        if (typeof body.actief === "boolean") sb.eindstand.actief = body.actief;
         if (body.deadlineEpoch !== undefined) {
           const d = body.deadlineEpoch === null ? null : Number(body.deadlineEpoch);
           if (d === null || Number.isFinite(d)) sb.eindstand.deadlineEpoch = d;
@@ -232,6 +233,9 @@ export default async (req) => {
       const { deelnemer, wachtwoord, kampioen, laatste, kampioenPunten, laatstePunten } = body;
       const fout = controleerDeelnemer(deelnemer, wachtwoord);
       if (fout) return Response.json({ fout }, { status: 401 });
+      if (!sb.eindstand.actief && !isAdmin) {
+        return Response.json({ fout: "Scorito King staat nog niet open." }, { status: 403 });
+      }
       if (!sb.eindstand.deadlineEpoch) {
         return Response.json({ fout: "De beheerder heeft nog geen deadline ingesteld." }, { status: 403 });
       }
