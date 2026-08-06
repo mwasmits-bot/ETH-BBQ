@@ -4066,9 +4066,9 @@ function renderSbEindstand(){
         <strong>Jouw voorspelling</strong>
         <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">
           <div><label style="font-size:13px;color:var(--chalk-dim)">👑 Kampioen</label><br><select id="skKampioen">${opt(mijn?mijn.kampioen:'')}</select></div>
-          <div><label style="font-size:13px;color:var(--chalk-dim)">Met hoeveel punten?</label><br><input type="number" min="0" max="20000" id="skKampioenPunten" style="width:90px" value="${mijn&&mijn.kampioenPunten!=null?mijn.kampioenPunten:''}"></div>
+          <div><label style="font-size:13px;color:var(--chalk-dim)">Met hoeveel punten?</label><br><input type="number" min="0" max="100000" id="skKampioenPunten" style="width:90px" value="${mijn&&mijn.kampioenPunten!=null?mijn.kampioenPunten:''}"></div>
           <div><label style="font-size:13px;color:var(--chalk-dim)">🍖 Laatste (bbq-loser)</label><br><select id="skLaatste">${opt(mijn?mijn.laatste:'')}</select></div>
-          <div><label style="font-size:13px;color:var(--chalk-dim)">Met hoeveel punten?</label><br><input type="number" min="0" max="20000" id="skLaatstePunten" style="width:90px" value="${mijn&&mijn.laatstePunten!=null?mijn.laatstePunten:''}"></div>
+          <div><label style="font-size:13px;color:var(--chalk-dim)">Met hoeveel punten?</label><br><input type="number" min="0" max="100000" id="skLaatstePunten" style="width:90px" value="${mijn&&mijn.laatstePunten!=null?mijn.laatstePunten:''}"></div>
           <button class="knop primair" data-eindstand-voorspel="1">Voorspelling bewaren</button>
         </div>
         ${heeftVoorspeld ? '<div style="margin-top:8px;color:#a3e635;font-size:14px">✓ Je voorspelling is opgeslagen'+(mijn?` — kampioen ${esc(mijn.kampioen)} (${mijn.kampioenPunten} pt), laatste ${esc(mijn.laatste)} (${mijn.laatstePunten} pt)`:'')+'.</div>' : ''}
@@ -4121,7 +4121,10 @@ function renderSbEindstandAdmin(){
     : '<span class="leeg">Nog geen deelnemers bekend.</span>';
   const paidRijen = voorspeldDoor.length
     ? voorspeldDoor.map(n=>{ const paid = !!(e.betaald||{})[n];
-        return `<div class="sb-adminrij"><span>${esc(n)}</span><button class="knop" data-eindstand-betaald="${esc(n)}" data-waarde="${paid?0:1}">${paid?'✓ inleg betaald':'○ nog niet'}</button></div>`; }).join('')
+        return `<div class="sb-adminrij"><span>${esc(n)}</span><span style="display:flex;gap:6px">
+          <button class="knop" data-eindstand-betaald="${esc(n)}" data-waarde="${paid?0:1}">${paid?'✓ inleg betaald':'○ nog niet'}</button>
+          <button class="knop" data-eindstand-verwijder="${esc(n)}" title="Voorspelling verwijderen">🗑</button>
+        </span></div>`; }).join('')
     : '<div class="leeg">Nog niemand heeft voorspeld.</div>';
   const opt = (sel) => '<option value="">— kies —</option>' + kand.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('');
   const deadlineLokaal = e.deadlineEpoch ? new Date(e.deadlineEpoch - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
@@ -4176,6 +4179,11 @@ document.addEventListener('click', (ev)=>{
   }
   else if(t.dataset.eindstandKandidaten){ const ks=[...document.querySelectorAll('.es-kand:checked')].map(c=>c.value); actie({actie:'eindstand-instellingen', kandidaten:ks}, 'Kandidaten opgeslagen ('+ks.length+').'); }
   else if(t.dataset.eindstandBetaald){ actie({actie:'eindstand-betaald', naam:t.dataset.eindstandBetaald, waarde:t.dataset.waarde==='1'}, 'Bijgewerkt.'); }
+  else if(t.dataset.eindstandVerwijder){
+    const naam = t.dataset.eindstandVerwijder;
+    if(!confirm(`Voorspelling van ${naam} verwijderen? Diegene kan daarna opnieuw invullen.`)) return;
+    actie({actie:'eindstand-verwijder', naam}, 'Voorspelling verwijderd.');
+  }
   else if(t.dataset.eindstandUitslag){
     const k=$('esUitKampioen').value, l=$('esUitLaatste').value;
     if(k && l && k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; }

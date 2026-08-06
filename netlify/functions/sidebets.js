@@ -186,7 +186,7 @@ export default async (req) => {
     }
 
     // ============= EINDSTAND (kampioen + bbq-loser) — ADMIN =============
-    if (["eindstand-instellingen", "eindstand-betaald", "eindstand-uitslag"].includes(body.actie)) {
+    if (["eindstand-instellingen", "eindstand-betaald", "eindstand-uitslag", "eindstand-verwijder"].includes(body.actie)) {
       if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
 
       if (body.actie === "eindstand-instellingen") {
@@ -213,6 +213,12 @@ export default async (req) => {
         if (!naam) return Response.json({ fout: "Geen naam opgegeven." }, { status: 400 });
         if (body.waarde) sb.eindstand.betaald[naam] = true;
         else delete sb.eindstand.betaald[naam];
+      }
+
+      if (body.actie === "eindstand-verwijder") {
+        const naam = String(body.naam || "").trim();
+        if (!naam) return Response.json({ fout: "Geen naam opgegeven." }, { status: 400 });
+        delete sb.eindstand.voorspellingen[naam];
       }
 
       if (body.actie === "eindstand-uitslag") {
@@ -260,7 +266,7 @@ export default async (req) => {
       }
       const kp = parseInt(kampioenPunten, 10);
       const lp = parseInt(laatstePunten, 10);
-      if (!Number.isInteger(kp) || kp < 0 || kp > 20000 || !Number.isInteger(lp) || lp < 0 || lp > 20000) {
+      if (!Number.isInteger(kp) || kp < 0 || kp > 100000 || !Number.isInteger(lp) || lp < 0 || lp > 100000) {
         return Response.json({ fout: "Vul een geldig gegokt puntenaantal in voor zowel de kampioen als de laatste." }, { status: 400 });
       }
       sb.eindstand.voorspellingen[String(deelnemer).trim()] = { kampioen: k, laatste: l, kampioenPunten: kp, laatstePunten: lp };
