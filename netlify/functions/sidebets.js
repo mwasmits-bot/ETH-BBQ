@@ -26,12 +26,15 @@ export default async (req) => {
   const isAdmin = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
 
-  // Scorito King-picks gewoon meesturen (net als bij de rest van Side Bets) — spelers moeten
-  // altijd betrouwbaar hun eigen ingevulde voorspelling terugzien, ook vóór de uitslag.
+  // Scorito King: andermans picks blijven verborgen tot de deadline verstreken is — daarna
+  // zijn ze voor iedereen zichtbaar, ook al is de uitslag pas maanden later bekend.
+  // Je eigen voorspelling haal je vóór de deadline op via de actie "eindstand-mijn".
   const eindstandPubliek = (e) => {
     if (!e) return e;
     const voorspeldDoor = Object.keys(e.voorspellingen || {});
-    return { ...e, voorspeldDoor };
+    const open = !!(e.deadlineEpoch && Date.now() >= e.deadlineEpoch);
+    if (open) return { ...e, voorspeldDoor };
+    return { ...e, voorspellingen: {}, voorspeldDoor };
   };
 
   // Super Side Bet: inzendingen blijven verborgen tot de aftrap — ook voor de admin,
@@ -267,9 +270,27 @@ export default async (req) => {
       if (!Number.isInteger(kp) || kp < 0 || kp > 100000 || !Number.isInteger(lp) || lp < 0 || lp > 100000) {
         return Response.json({ fout: "Vul een geldig gegokt puntenaantal in voor zowel de kampioen als de laatste." }, { status: 400 });
       }
-      sb.eindstand.voorspellingen[String(deelnemer).trim()] = { kampioen: k, laatste: l, kampioenPunten: kp, laatstePunten: lp };
+      const eigen = { kampioen: k, laatste: l, kampioenPunten: kp, laatstePunten: lp };
+      sb.eindstand.voorspellingen[String(deelnemer).trim()] = eigen;
       await bewaar();
-      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+      // Eigen voorspelling meteen teruggeven: schoonAntwoord filtert 'm vóór de deadline weg.
+      return Response.json({ ok: true, eigen, sidebets: schoonAntwoord(sb) });
+    }
+
+    // Eigen Scorito King-voorspelling ophalen vóór de deadline, wanneer schoonAntwoord
+    // andermans (en dus ook je eigen) picks nog wegfiltert. Wachtwoord-gecontroleerd,
+    // net als de "mijn"-actie van het Orakel.
+    if (body.actie === "eindstand-mijn") {
+      const naam = String(body.deelnemer || "").trim();
+      const team = teams[naam];
+      if (!naam || !team) return Response.json({ fout: "Deelnemer niet gevonden." }, { status: 400 });
+      if (team.wachtwoord && String(body.wachtwoord || "") !== team.wachtwoord) {
+        return Response.json({ fout: "Onjuist wachtwoord voor deze deelnemer." }, { status: 401 });
+      }
+      return Response.json({
+        ok: true,
+        voorspelling: sb.eindstand.voorspellingen[naam] || null
+      }, { headers: { "cache-control": "no-store" } });
     }
 
     // ============= SUPER SIDE BET — ADMIN =============

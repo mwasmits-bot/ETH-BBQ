@@ -637,7 +637,8 @@
     <div id="sbViewEindstand" style="display:none">
       <div class="card">
         <h2>👑 Scorito King — Kampioen &amp; bbq-loser</h2>
-        <p class="uitleg">Voorspel wie de poule wint (kampioen) én wie laatste wordt (de bbq-loser) — én met hoeveel punten. Aparte pot met eigen inleg. Puntentelling: de juiste naam levert een flinke bonus op, maar ook als je de naam mist tellen minpunten mee voor hoe dicht je bij het echte puntenaantal zat — dus reken tot de laatste speelronde mee. Hoogste score wint de pot, bij gelijke stand wordt gedeeld. Voorspellingen van anderen blijven verborgen tot de uitslag bekend is — alleen wíe heeft ingevuld en of de inleg betaald is, is zichtbaar.</p>
+        <p class="uitleg">Voorspel wie de poule wint (kampioen) én wie laatste wordt (de bbq-loser) — én met hoeveel punten. Aparte pot met eigen inleg. Puntentelling: de juiste naam levert een flinke bonus op, maar ook als je de naam mist tellen minpunten mee voor hoe dicht je bij het echte puntenaantal zat — dus reken tot de laatste speelronde mee. Hoogste score wint de pot, bij gelijke stand wordt gedeeld.<br><br>
+        🙈 <strong>Voorspellingen van anderen blijven verborgen tot de deadline verstreken is</strong> — tot dat moment zie je alleen wíe al heeft ingevuld en of de inleg betaald is. Zodra de deadline voorbij is, worden alle voorspellingen voor iedereen zichtbaar; je hoeft dus niet tot het eind van het seizoen te wachten om te zien wat de rest gegokt heeft. Je eigen voorspelling zie je uiteraard altijd, en je kunt hem tot de deadline aanpassen.</p>
         <div id="sbEindstandInhoud"></div>
       </div>
       <div class="card" id="sbEindstandAdmin" style="display:none"></div>
@@ -3964,6 +3965,27 @@ document.addEventListener('click', (ev)=>{
 const skFmt = iso => new Date(iso).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
 function sbEindstand(){ return sbData.eindstand || { actief:false, deadlineEpoch:null, inleg:10, naamBonus:50, kandidaten:[], voorspellingen:{}, betaald:{}, voorspeldDoor:[], kampioen:null, laatste:null }; }
 
+/* Vóór de deadline filtert de server alle picks weg — ook je eigen. Die halen we apart op
+   (wachtwoord-gecontroleerd), zodat je altijd ziet wat je hebt ingevuld en het kunt wijzigen. */
+let skMijn = null;
+let skMijnFout = '';
+let skMijnGeladenVoor = null;
+async function laadEigenEindstand(force){
+  if(!sbSessie) return;
+  if(!force && skMijnGeladenVoor === sbSessie) return;
+  skMijnGeladenVoor = sbSessie;
+  try{
+    const r = await fetch(SB_API, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ actie:'eindstand-mijn', deelnemer:sbSessie, wachtwoord:sbSessieWw })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){ skMijnFout = j.fout || ('serverfout ' + r.status); skMijn = null; }
+    else { skMijnFout = ''; skMijn = j.voorspelling || null; }
+  }catch(e){ skMijnFout = 'Kon je eigen voorspelling niet ophalen: ' + e.message; skMijn = null; }
+  renderSbEindstand();
+}
+
 // Echte eindpuntentotalen komen uit de eigen Scorito-stand van de app (Totaalklassement) — niemand hoeft ze over te typen.
 function skWerkelijkePunten(naam){
   const { totaal } = tellingen();
@@ -4029,9 +4051,11 @@ function renderSbEindstand(){
   }
 
   if(sbSessie){
-    const mijn = (e.voorspellingen || {})[sbSessie];
+    // Vóór de deadline filtert de server picks weg; dan komt de eigen voorspelling uit skMijn.
+    const mijn = (e.voorspellingen || {})[sbSessie] || skMijn;
     const heeftVoorspeld = voorspeldDoor.includes(sbSessie);
     const isBetaald = !!(e.betaald || {})[sbSessie];
+    if(!deadlineVerstreken) laadEigenEindstand();
     if(gesloten){
       html += `<div class="card" style="margin-top:12px"><p class="uitleg" style="margin:0">De uitslag is bekend — voorspellen kan niet meer.${heeftVoorspeld?'':' Je hebt niet meegedaan.'}</p></div>`;
     } else if(deadlineVerstreken){
@@ -4048,6 +4072,7 @@ function renderSbEindstand(){
           <button class="knop primair" data-eindstand-voorspel="1">Voorspelling bewaren</button>
         </div>
         ${heeftVoorspeld ? '<div style="margin-top:8px;color:#a3e635;font-size:14px">✓ Je voorspelling is opgeslagen'+(mijn?` — kampioen ${esc(mijn.kampioen)} (${mijn.kampioenPunten} pt), laatste ${esc(mijn.laatste)} (${mijn.laatstePunten} pt)`:'')+'.</div>' : ''}
+        ${skMijnFout ? `<div style="margin-top:8px;color:rgba(255,120,120,.9);font-size:14px">⚠ ${esc(skMijnFout)}</div>` : ''}
       </div>`;
       if(!isBetaald){
         const link = sbBunqLink(inleg, `ScoritoKing-inleg ${sbSessie}`);
@@ -4072,9 +4097,17 @@ function renderSbEindstand(){
     html += `<table class="stand"><tr><th></th><th>Deelnemer</th><th>Kampioen</th><th>Laatste</th><th style="text-align:right">Score</th></tr>`
       + stand.map((r,i)=>`<tr class="${i===0?'p1':''}"><td class="pos">${i+1}</td><td>${esc(r.naam)}</td><td>${esc(r.kampioen)} (${r.kampioenPunten}${r.verschilKamp!=null?', Δ'+r.verschilKamp:''})</td><td>${esc(r.laatste)} (${r.laatstePunten}${r.verschilLaat!=null?', Δ'+r.verschilLaat:''})</td><td class="num">${r.punten}</td></tr>`).join('')
       + `</table><p class="uitleg" style="margin:8px 0 0">Score = ${bonus} punten bij de juiste naam, min het verschil (Δ) tussen je gegokte en het echte puntenaantal — voor kampioen én laatste apart.</p>`;
+  } else if(deadlineVerstreken && voorspeldDoor.length){
+    // Deadline voorbij, uitslag nog niet bekend: iedereens gok is nu open en zichtbaar.
+    const vs = e.voorspellingen || {};
+    html += `<table class="stand"><tr><th>Deelnemer</th><th>Kampioen</th><th>Laatste</th><th></th></tr>`
+      + voorspeldDoor.map(n=>{ const v = vs[n] || {};
+          return `<tr><td>${esc(n)}</td><td>${v.kampioen?esc(v.kampioen)+' ('+v.kampioenPunten+' pt)':'—'}</td><td>${v.laatste?esc(v.laatste)+' ('+v.laatstePunten+' pt)':'—'}</td><td>${betaaldNamen.includes(n)?'✅':'⏳'}</td></tr>`;
+        }).join('')
+      + `</table><p class="uitleg" style="margin:8px 0 0">✅ = inleg betaald, ⏳ = nog niet. De deadline is verstreken, dus alle voorspellingen liggen nu open. De eindscore volgt zodra de beheerder de uitslag vastlegt.</p>`;
   } else {
     const lijst = voorspeldDoor.map(n => `${esc(n)} ${betaaldNamen.includes(n)?'✅':'⏳'}`).join(' · ');
-    html += voorspeldDoor.length ? `<div>${lijst}</div><p class="uitleg" style="margin:8px 0 0">✅ = inleg betaald, ⏳ = nog niet. Voorspellingen blijven verborgen tot de uitslag bekend is.</p>` : '<div class="leeg">Nog niemand heeft voorspeld.</div>';
+    html += voorspeldDoor.length ? `<div>${lijst}</div><p class="uitleg" style="margin:8px 0 0">✅ = inleg betaald, ⏳ = nog niet. Elkaars voorspellingen blijven verborgen tot de deadline verstreken is.</p>` : '<div class="leeg">Nog niemand heeft voorspeld.</div>';
   }
   html += `</div>`;
 
@@ -4176,7 +4209,14 @@ document.addEventListener('click', (ev)=>{
     if(!k||!l){ melding('fout','Kies zowel kampioen als laatste.'); return; }
     if(k===l){ melding('fout','Kampioen en laatste moeten verschillen.'); return; }
     if(!Number.isInteger(kp)||kp<0||!Number.isInteger(lp)||lp<0){ melding('fout','Vul voor beiden een gegokt puntenaantal in (0 of hoger).'); return; }
-    actie({actie:'eindstand-voorspel', deelnemer:sbSessie, wachtwoord:sbSessieWw, kampioen:k, laatste:l, kampioenPunten:kp, laatstePunten:lp}, 'Voorspelling opgeslagen.');
+    (async ()=>{
+      try{
+        const j = await sbPost({actie:'eindstand-voorspel', deelnemer:sbSessie, wachtwoord:sbSessieWw, kampioen:k, laatste:l, kampioenPunten:kp, laatstePunten:lp});
+        skMijn = j.eigen || null; skMijnFout = '';
+        renderSidebets();
+        melding('info','Voorspelling opgeslagen.');
+      }catch(err){ melding('fout', err.message); }
+    })();
   }
 });
 
@@ -4509,6 +4549,8 @@ function spelerLogin(){
   sbSyncOrakelSessie();
   orakelEigenGeladenVoor = null;
   if(typeof laadEigenOrakel==='function') laadEigenOrakel(true);
+  skMijn = null; skMijnFout = ''; skMijnGeladenVoor = null;
+  if(typeof laadEigenEindstand==='function') laadEigenEindstand(true);
   if(typeof sbHaalUitbetaal==='function') sbHaalUitbetaal();
   if(typeof renderSidebets==='function') renderSidebets();
   if(typeof renderOrakel==='function') renderOrakel();
@@ -4521,6 +4563,7 @@ if($('sbAfmelden')) $('sbAfmelden').addEventListener('click', ()=>{
   sbSessie = null; sbSessieWw = '';
   ethWis('eth_speler_naam','eth_speler_ww','eth_speler_exp');
   orakelEigenGeladenVoor = null;
+  skMijn = null; skMijnFout = ''; skMijnGeladenVoor = null;
   sbToonInlog();
   sbSyncOrakelSessie();
   verbergStatus('sbSessieStatus');
