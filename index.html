@@ -487,7 +487,7 @@
         <button class="actie stil mini" id="btnOrakelTeamsHandmatig">Handmatige lijst opslaan</button>
       </div>
       <h3 style="margin-top:18px">Publiceren</h3>
-      <p class="uitleg">Zolang de voorspellingen niet gepubliceerd zijn, ziet niemand elkaars lijstjes — alleen wíe er heeft ingediend. Publiceer zodra de eerste speelronde is begonnen.</p>
+      <p class="uitleg">Zolang de voorspellingen niet gepubliceerd zijn, ziet niemand elkaars lijstjes — alleen wíe er heeft ingediend. Publiceer zodra de transferdeadline is geweest.</p>
       <div class="knoppenrij" style="margin-top:0">
         <button class="actie mini" id="btnOrakelPubliceer"></button>
         <button class="actie stil mini" id="btnOrakelVernieuwStand">Live stand nu verversen</button>
@@ -2737,7 +2737,9 @@ function updateWisselTeller(){
   const el = $('orakelWisselTeller');
   if(!el) return;
   if(orakelFase !== 'wissel' || !orakelBasis){ el.textContent = ''; return; }
-  const lc = x => String(x).trim().toLowerCase();
+  // Zelfde sleutel als de server: alias-bewust, zodat een andere schrijfwijze van
+  // dezelfde speler niet als gouden wissel telt.
+  const lc = x => normO(aliasVoor(x));
   const basisLc = new Set(orakelBasis.map(lc));
   const huidig = orakelTsNamen().map(lc).filter(Boolean);
   const gewisseld = Math.max(0, 3 - [...basisLc].filter(b => huidig.includes(b)).length);
@@ -2805,7 +2807,7 @@ $('btnOrakelIndienen').addEventListener('click', async ()=>{
   if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Kies alle drie de topscorers (eerst het team, dan de speler).'); return; }
   if(new Set(topscorers.map(t=>normO(t))).size < 3){ toonStatus('orakelStatus','fout','Kies drie verschillende spelers.'); return; }
   if(orakelFase==='wissel' && orakelBasis){
-    const lc=x=>String(x).trim().toLowerCase();
+    const lc=x=>normO(aliasVoor(x));
     const basisLc=new Set(orakelBasis.map(lc));
     const behouden=[...basisLc].filter(b=>topscorers.map(lc).includes(b)).length;
     if(behouden<1){ toonStatus('orakelStatus','fout','Je mag max. 2 topscorers wisselen — minstens 1 van je oorspronkelijke 3 moet blijven staan.'); return; }
@@ -2839,7 +2841,7 @@ function renderOrakelStand(){
   const uitleg = $('orakelStandUitleg');
   if(!orakelInfo){ houder.innerHTML=''; uitleg.textContent=''; return; }
   if(!orakelInfo.gepubliceerd){
-    uitleg.textContent = 'De voorspellingen worden zichtbaar zodra de eerste speelronde is begonnen en de beheerder publiceert.';
+    uitleg.textContent = 'De voorspellingen worden zichtbaar zodra de transferdeadline is geweest en de beheerder publiceert.';
     const namen = orakelInfo.namen||[];
     houder.innerHTML = namen.length
       ? `<div class="leeg">Al ingediend (${namen.length}): ${namen.map(esc).join(', ')}</div>`

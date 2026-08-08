@@ -75,7 +75,18 @@ export default async (req) => {
 
     const naam = String(deelnemer).trim();
     const bestaand = voorspellingen[naam];
-    const lc = (x) => String(x).trim().toLowerCase();
+
+    // Vergelijken van topscorers gebeurt op een genormaliseerde sleutel, mét de
+    // alias-koppeling van de beheerder. Zo telt het niet als gouden wissel wanneer
+    // dezelfde speler alleen anders geschreven staat — bijvoorbeeld doordat een
+    // vrij getypte naam ("Smik") vervangen is door de officiële naam uit de
+    // spelerslijst ("Brian Brobbey").
+    const aliassen = (hoofd && hoofd.aliassen) || {};
+    const norm = (x) => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const lc = (x) => {
+      const n = norm(x);
+      return norm(aliassen[n] || x);
+    };
 
     // Topscorers controleren (altijd 3)
     const schoon = topscorers.slice(0, 3).map(t => String(t).trim()).filter(Boolean);
