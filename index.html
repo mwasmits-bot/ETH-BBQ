@@ -474,6 +474,13 @@
         <input type="datetime-local" id="orakelWisselDeadlineInput" style="max-width:240px;background:var(--pitch-deep);border:1.5px solid var(--line);border-radius:8px;color:var(--chalk);font-family:'Barlow',sans-serif;font-size:15px;padding:9px 12px">
         <button class="actie mini" id="btnOrakelWisselDeadline">Wissel-deadline opslaan</button>
       </div>
+      <h3 style="margin-top:18px">🧪 Test: spelerslijst (football-data)</h3>
+      <p class="uitleg" style="margin-top:0">Haalt de squads van alle Eredivisie-teams op, puur om te controleren of de namen kloppen en hoe vers ze zijn. Verandert niets aan het Orakel — het is een verkenning of we hier later een keuzelijst voor de topscorers van kunnen maken. Let op: de gratis API staat 10 verzoeken per minuut toe, dus niet blijven klikken (het resultaat wordt 24 uur gecachet).</p>
+      <div class="knoppenrij" style="margin-top:0">
+        <button class="actie stil mini" id="btnOrakelSpelers">Spelerslijst ophalen</button>
+        <button class="actie stil mini" id="btnOrakelSpelersVers">Cache negeren &amp; opnieuw ophalen</button>
+      </div>
+      <div id="orakelSpelersUit" style="margin-top:12px"></div>
       <h3 style="margin-top:18px">Teams (18)</h3>
       <p class="uitleg">Haal de teams met logo's op via de football-data.org API (vereist FOOTBALL_DATA_KEY in Netlify), of plak hieronder handmatig één teamnaam per regel.</p>
       <div class="knoppenrij" style="margin-top:0">
@@ -2871,6 +2878,52 @@ $('btnOrakelWisselDeadline').addEventListener('click', async ()=>{
   renderOrakel();
   toonStatus('orakelAdminStatus','info', val ? 'Gouden-wissel-deadline opgeslagen ✓ — na de 1e speelronde mag men tot dan max. 2 topscorers wisselen.' : 'Gouden-wissel-deadline gewist — wisselen staat uit.');
 });
+
+/* TEST-knop: squads ophalen zodat de beheerder zelf kan beoordelen of de spelerslijst
+   klopt en vers genoeg is. Verandert niets aan het Orakel zelf. */
+const SPELERS_API = '/.netlify/functions/spelers';
+async function orakelSpelersOphalen(vers){
+  if(!isAdmin) return;
+  const uit = $('orakelSpelersUit');
+  const knoppen = [$('btnOrakelSpelers'), $('btnOrakelSpelersVers')].filter(Boolean);
+  knoppen.forEach(b=> b.disabled = true);
+  uit.innerHTML = '<p class="uitleg"><span class="laden"></span>Spelerslijst wordt opgehaald…</p>';
+  try{
+    const r = await fetch(SPELERS_API + (vers ? '?vernieuw=1' : ''), {
+      headers:{'x-wachtwoord': adminWachtwoord||''}, cache:'no-store'
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.fout || ('serverfout ' + r.status));
+
+    const dat = iso => iso ? new Date(iso).toLocaleString('nl-NL',{dateStyle:'medium',timeStyle:'short'}) : 'onbekend';
+    let html = `<div class="card" style="margin:0">
+      <strong>${j.aantalSpelers} spelers uit ${j.aantalTeams} teams</strong>
+      <div style="color:var(--chalk-dim);font-size:13px;margin-top:4px">Opgehaald: ${dat(j.opgehaald)}${j.uitCache?' (uit cache — gebruik "Cache negeren" voor verse data)':''}</div>
+    </div>`;
+
+    if(j.teamsZonderSpelers && j.teamsZonderSpelers.length){
+      html += `<div class="card" style="margin-top:10px;border-left:3px solid var(--red)">
+        <strong style="color:var(--red)">⚠ Geen spelers voor: ${j.teamsZonderSpelers.map(esc).join(', ')}</strong>
+        <div style="color:var(--chalk-dim);font-size:13px;margin-top:4px">Levert je API-plan geen squads bij dit endpoint, dan is een dropdown op basis hiervan niet betrouwbaar.</div>
+      </div>`;
+    }
+
+    html += (j.teams||[]).map(t=>`<details style="margin-top:8px;background:var(--pitch-deep);border:1px solid var(--line);border-radius:8px;padding:8px 12px">
+      <summary style="cursor:pointer"><strong>${esc(t.naam)}</strong> <span style="color:var(--chalk-dim);font-size:13px">— ${t.spelers.length} spelers · bijgewerkt op ${dat(t.bijgewerkt)}</span></summary>
+      <div style="margin-top:8px;font-size:14px;line-height:1.8">${
+        t.spelers.length ? t.spelers.map(s=>`${esc(s.naam)}<span style="color:var(--chalk-dim);font-size:12px">${s.positie?' ('+esc(s.positie)+')':''}</span>`).join(' · ')
+                         : '<span style="color:var(--red)">geen spelers teruggegeven</span>'
+      }</div>
+    </details>`).join('');
+
+    uit.innerHTML = html;
+  }catch(e){
+    uit.innerHTML = `<div class="card" style="margin:0;border-left:3px solid var(--red)"><strong style="color:var(--red)">Ophalen mislukt</strong><div style="margin-top:4px;font-size:14px">${esc(e.message)}</div></div>`;
+  }finally{ knoppen.forEach(b=> b.disabled = false); }
+}
+if($('btnOrakelSpelers'))     $('btnOrakelSpelers').addEventListener('click', ()=> orakelSpelersOphalen(false));
+if($('btnOrakelSpelersVers')) $('btnOrakelSpelersVers').addEventListener('click', ()=> orakelSpelersOphalen(true));
+
 $('btnOrakelTeamsApi').addEventListener('click', async ()=>{
   if(!isAdmin) return;
   toonStatus('orakelAdminStatus','info','<span class="laden"></span>Teams worden opgehaald via football-data.org…');
