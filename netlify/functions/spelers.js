@@ -1,10 +1,9 @@
-// TEST: haalt de Eredivisie-squads op via football-data.org, zodat de beheerder met eigen
-// ogen kan zien of de spelerslijsten kloppen en hoe vers ze zijn — vóórdat we besluiten er
-// een dropdown van te maken in het Orakel (topscorers).
+// Eredivisie-squads via football-data.org. Voedt de topscorer-keuzelijst in het Orakel
+// (eerst team kiezen, dan speler) en de admin-testknop die laat zien hoe vers de data is.
 //
-// Puur informatief: verandert niets aan het Orakel of de bestaande werking.
-// Alleen bereikbaar voor de admin (x-wachtwoord), zodat we de gratis rate limit
-// (10 requests/minuut) niet opbranden aan gewone bezoekers.
+// Iedereen mag lezen — anders kan een deelnemer geen speler kiezen. De rate limit
+// (10 requests/minuut op de gratis tier) blijft veilig doordat het resultaat 24 uur
+// gecachet wordt; alleen de admin mag met ?vernieuw=1 die cache omzeilen.
 //
 // Vereist environment variable FOOTBALL_DATA_KEY (dezelfde als stand.js / wedstrijden.js).
 import { getStore } from "@netlify/blobs";
@@ -19,11 +18,8 @@ export default async (req) => {
 
   const isAdminReq = !!process.env.ADMIN_WACHTWOORD &&
     (req.headers.get("x-wachtwoord") || "") === process.env.ADMIN_WACHTWOORD;
-  if (!isAdminReq) {
-    return Response.json({ fout: "Alleen de beheerder kan de spelerslijst ophalen." }, { status: 401 });
-  }
 
-  const vernieuw = url.searchParams.get("vernieuw") === "1";
+  const vernieuw = url.searchParams.get("vernieuw") === "1" && isAdminReq;
   const cache = await store.get("fd-spelers", { type: "json" });
   if (cache && Date.now() - cache.tijd < 24 * UUR && !vernieuw) {
     return Response.json({ ...cache, uitCache: true }, { headers: { "cache-control": "no-store" } });

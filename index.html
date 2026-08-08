@@ -441,12 +441,8 @@
         <h3 id="orakelTeamKop">1 · Eindstand eredivisie <span style="text-transform:none;letter-spacing:0;font-weight:400">— sleep de teams op volgorde, of gebruik ▲▼</span></h3>
         <div id="orakelTeams"></div>
         <h3 style="margin-top:20px">2 · Top 3 topscorers</h3>
-        <p class="uitleg" style="font-size:14px">Typ de namen van de drie spelers die volgens jou de meeste doelpunten maken. Schrijf ze zo volledig mogelijk (bijv. "Brian Brobbey").</p>
-        <table class="editor" style="max-width:480px">
-          <tr><td style="width:36px;font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--amber)">1</td><td><input type="text" id="orakelTs1" placeholder="Dé topscorer"></td></tr>
-          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">2</td><td><input type="text" id="orakelTs2" placeholder="Nummer 2"></td></tr>
-          <tr><td style="font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--chalk-dim)">3</td><td><input type="text" id="orakelTs3" placeholder="Nummer 3"></td></tr>
-        </table>
+        <p class="uitleg" style="font-size:14px">Kies per plek eerst het <strong>team</strong> en daarna de <strong>speler</strong> — de spelerslijsten komen rechtstreeks uit de officiële Eredivisie-data, dus typefouten kunnen niet meer. Staat een speler er nog niet bij (bijv. net getransfereerd), kies dan “✏️ andere speler — zelf typen”.</p>
+        <div id="orakelTsRijen"></div>
         <div class="knoppenrij">
           <button class="actie" id="btnOrakelIndienen">🔮 Voorspelling indienen</button>
         </div>
@@ -2465,6 +2461,113 @@ let orakelBasis = null;      // topscorers zoals vastgelegd bij de 1e speelronde
 
 function normO(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 
+/* ---------- topscorers: team-keuze + spelerskeuze ----------
+   De drie topscorers worden nu per plek gekozen uit de officiële squads (spelers.js).
+   orakelTs houdt per plek bij wat er staat: {team, naam}. 'naam' blijft de opgeslagen
+   waarde, precies zoals vroeger de vrije tekst — zo blijven scoring en aliassen werken. */
+let spelersData = null;                       // {teams:[{naam, spelers:[{naam,positie}]}]}
+let orakelTs = [ {team:'',naam:''}, {team:'',naam:''}, {team:'',naam:''} ];
+const TS_VRIJ = '__vrij__';                   // "andere speler — zelf typen"
+
+async function laadSpelers(){
+  if(spelersData) return spelersData;
+  try{
+    const r = await fetch('/.netlify/functions/spelers', { cache:'no-store' });
+    const j = await r.json().catch(()=>({}));
+    if(r.ok && Array.isArray(j.teams)) spelersData = j;
+  }catch(e){ /* stil: renderOrakelTs valt terug op vrije invoer */ }
+  return spelersData;
+}
+
+/* Zoekt bij een opgeslagen (getypte) naam de bijbehorende speler in de squads.
+   Gebruikt eerst de alias-koppeling die de beheerder heeft gemaakt, daarna een
+   normalisatie-match en tot slot een deelmatch op achternaam. Niets gevonden?
+   Dan blijft de oorspronkelijke naam gewoon staan als vrije invoer — een bestaande
+   keuze mag nooit stilzwijgend verdwijnen. */
+function zoekSpeler(getypt){
+  const ruw = String(getypt||'').trim();
+  if(!ruw) return null;
+  const doel = normO(aliasVoor(ruw));
+  const teams = (spelersData && spelersData.teams) || [];
+  let deelTreffer = null;
+  for(const t of teams){
+    for(const s of (t.spelers||[])){
+      const sn = normO(s.naam);
+      if(sn === doel) return { team:t.naam, naam:s.naam, exact:true };
+      if(!deelTreffer && (sn.includes(doel) || doel.includes(sn))) deelTreffer = { team:t.naam, naam:s.naam, exact:false };
+    }
+  }
+  return deelTreffer;
+}
+
+/* Zet opgeslagen topscorers om naar team+speler. Onbekende namen blijven behouden
+   als vrije invoer, met een zichtbare melding zodat de deelnemer het zelf kan nalopen. */
+function orakelTsUitNamen(namen){
+  orakelTs = [0,1,2].map(i=>{
+    const naam = (namen && namen[i]) ? String(namen[i]).trim() : '';
+    if(!naam) return { team:'', naam:'' };
+    const hit = zoekSpeler(naam);
+    if(hit) return { team:hit.team, naam:hit.naam, gekoppeld:!hit.exact ? naam : null };
+    return { team:TS_VRIJ, naam, onbekend:true };
+  });
+}
+
+function orakelTsNamen(){ return orakelTs.map(r=> String(r.naam||'').trim()); }
+
+function renderOrakelTs(){
+  const houder = $('orakelTsRijen');
+  if(!houder) return;
+  const teams = (spelersData && spelersData.teams) || [];
+  const kop = ['Dé topscorer','Nummer 2','Nummer 3'];
+  const kleur = i => i===0 ? 'var(--amber)' : 'var(--chalk-dim)';
+
+  houder.innerHTML = orakelTs.map((rij,i)=>{
+    const teamOpties = '<option value="">— kies team —</option>'
+      + teams.map(t=>`<option value="${esc(t.naam)}" ${rij.team===t.naam?'selected':''}>${esc(t.naam)}</option>`).join('')
+      + `<option value="${TS_VRIJ}" ${rij.team===TS_VRIJ?'selected':''}>✏️ andere speler — zelf typen</option>`;
+
+    let tweede;
+    if(rij.team === TS_VRIJ || (!teams.length)){
+      tweede = `<input type="text" data-ts-vrij="${i}" value="${esc(rij.naam||'')}" placeholder="${kop[i]}" style="min-width:200px">`;
+    } else if(!rij.team){
+      tweede = `<select disabled><option>— kies eerst een team —</option></select>`;
+    } else {
+      const team = teams.find(t=>t.naam===rij.team);
+      const sp = (team && team.spelers) || [];
+      tweede = `<select data-ts-speler="${i}"><option value="">— kies speler —</option>`
+        + sp.map(s=>`<option value="${esc(s.naam)}" ${rij.naam===s.naam?'selected':''}>${esc(s.naam)}${s.positie?' · '+esc(s.positie):''}</option>`).join('')
+        + `</select>`;
+    }
+
+    const notitie = rij.onbekend
+      ? `<div style="font-size:12px;color:var(--amber);margin-top:4px">⚠ “${esc(rij.naam)}” staat niet in de officiële spelerslijst — je keuze is bewaard, controleer of de naam klopt.</div>`
+      : (rij.gekoppeld ? `<div style="font-size:12px;color:var(--chalk-dim);margin-top:4px">Gekoppeld aan jouw eerdere keuze “${esc(rij.gekoppeld)}”.</div>` : '');
+
+    return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <span style="width:22px;font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:${kleur(i)}">${i+1}</span>
+      <select data-ts-team="${i}">${teamOpties}</select>
+      ${tweede}
+    </div>${notitie}`;
+  }).join('');
+
+  houder.querySelectorAll('[data-ts-team]').forEach(sel=> sel.addEventListener('change', ()=>{
+    const i = Number(sel.dataset.tsTeam);
+    orakelTs[i] = { team: sel.value, naam:'' };   // ander team = speler opnieuw kiezen
+    renderOrakelTs();
+    updateWisselTeller();
+  }));
+  houder.querySelectorAll('[data-ts-speler]').forEach(sel=> sel.addEventListener('change', ()=>{
+    const i = Number(sel.dataset.tsSpeler);
+    orakelTs[i] = { team: orakelTs[i].team, naam: sel.value };
+    updateWisselTeller();
+  }));
+  houder.querySelectorAll('[data-ts-vrij]').forEach(inp=> inp.addEventListener('input', ()=>{
+    const i = Number(inp.dataset.tsVrij);
+    orakelTs[i] = { team: TS_VRIJ, naam: inp.value };
+    updateWisselTeller();
+  }));
+}
+
 async function laadOrakel(){
   try{
     const headers = (isAdmin && adminWachtwoord) ? {'x-wachtwoord': adminWachtwoord} : {};
@@ -2507,9 +2610,9 @@ async function laadEigenOrakel(force){
       teamNamen.forEach(n=>{ if(!v.includes(n)) v.push(n); });   // vul aan mochten teams gewijzigd zijn
       if(v.length === teamNamen.length) orakelVolgorde = v;
       const ts = j.voorspelling.topscorers||[];
-      if($('orakelTs1')) $('orakelTs1').value = ts[0]||'';
-      if($('orakelTs2')) $('orakelTs2').value = ts[1]||'';
-      if($('orakelTs3')) $('orakelTs3').value = ts[2]||'';
+      await laadSpelers();                 // squads nodig om de eerdere keuze te koppelen
+      orakelTsUitNamen(ts);
+      renderOrakelTs();
       if($('orakelTeams')) renderOrakelTeams();
       if(typeof updateWisselTeller==='function') updateWisselTeller();
       toonStatus('orakelStatus','info', wissel
@@ -2517,6 +2620,8 @@ async function laadEigenOrakel(force){
         : '✓ Je hebt al ingediend — hieronder staat je huidige voorspelling. Je kunt hem tot de deadline aanpassen en opnieuw indienen.');
     } else {
       orakelBasis = null;
+      await laadSpelers();
+      renderOrakelTs();
       toonStatus('orakelStatus', wissel?'fout':'info', wissel
         ? 'Je hebt vóór de 1e speelronde geen voorspelling ingediend — meedoen kan niet meer.'
         : 'Je hebt nog niet ingediend — vul hieronder je voorspelling in en dien deze in.');
@@ -2607,6 +2712,8 @@ function renderOrakel(){
       orakelVolgorde = [...teamNamen].sort((a,b)=>a.localeCompare(b,'nl'));
     }
     renderOrakelTeams();
+    renderOrakelTs();
+    laadSpelers().then(d=>{ if(d) renderOrakelTs(); });   // squads nakomen, dan opnieuw tekenen
 
     const wissel = fase==='wissel';
     if($('orakelTeamKop')) $('orakelTeamKop').innerHTML = wissel
@@ -2632,7 +2739,7 @@ function updateWisselTeller(){
   if(orakelFase !== 'wissel' || !orakelBasis){ el.textContent = ''; return; }
   const lc = x => String(x).trim().toLowerCase();
   const basisLc = new Set(orakelBasis.map(lc));
-  const huidig = [$('orakelTs1').value, $('orakelTs2').value, $('orakelTs3').value].map(lc).filter(Boolean);
+  const huidig = orakelTsNamen().map(lc).filter(Boolean);
   const gewisseld = Math.max(0, 3 - [...basisLc].filter(b => huidig.includes(b)).length);
   el.innerHTML = 'Nu gewisseld: <strong>' + Math.min(gewisseld,3) + ' van 2</strong>.'
     + (gewisseld > 2 ? ' <span style="color:var(--red)">Te veel — zet er minstens 1 origineel terug.</span>' : '');
@@ -2687,15 +2794,16 @@ $('orakelNaam').addEventListener('change', ()=>{
   if(!heeftWw) $('orakelWachtwoord').value = '';
 });
 
-['orakelTs1','orakelTs2','orakelTs3'].forEach(id=>{ if($(id)) $(id).addEventListener('input', ()=>{ if(typeof updateWisselTeller==='function') updateWisselTeller(); }); });
+// (de wisselteller wordt bijgewerkt vanuit renderOrakelTs zelf)
 $('btnOrakelIndienen').addEventListener('click', async ()=>{
   const naam = (typeof sbSessie!=='undefined' && sbSessie) ? sbSessie : $('orakelNaam').value;
   if(!naam){ if(typeof openSpelerLogin==='function') openSpelerLogin(); toonStatus('orakelStatus','fout','Log eerst in om je voorspelling te doen.'); return; }
   const team = data.teams && data.teams[naam];
   const wachtwoord = (typeof sbSessie!=='undefined' && sbSessie) ? (sbSessieWw||'') : (team && team.wachtwoord ? $('orakelWachtwoord').value : '');
   if(team && team.wachtwoord && !wachtwoord){ toonStatus('orakelStatus','fout','Vul je wachtwoord in.'); return; }
-  const topscorers = [$('orakelTs1').value.trim(), $('orakelTs2').value.trim(), $('orakelTs3').value.trim()];
-  if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Vul alle drie de topscorers in.'); return; }
+  const topscorers = orakelTsNamen();
+  if(topscorers.some(t=>!t)){ toonStatus('orakelStatus','fout','Kies alle drie de topscorers (eerst het team, dan de speler).'); return; }
+  if(new Set(topscorers.map(t=>normO(t))).size < 3){ toonStatus('orakelStatus','fout','Kies drie verschillende spelers.'); return; }
   if(orakelFase==='wissel' && orakelBasis){
     const lc=x=>String(x).trim().toLowerCase();
     const basisLc=new Set(orakelBasis.map(lc));
