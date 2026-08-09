@@ -4671,7 +4671,11 @@ document.addEventListener('click', (ev)=>{
 /* =============== Super Side Bet =============== */
 const sbFmt = iso => new Date(iso).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'});
 function sbSuper(){ return sbData.super || { inleg:10, potCarry:0, wedstrijd:null, inzendingen:{}, betaald:{}, afgerond:false, winnaars:null, uitslag:null, geschiedenis:[], ingezondenDoor:[] }; }
+/* Alleen betaalde inleg telt mee: wie wel heeft ingezonden maar nog niet betaald
+   heeft, zit niet in de pot. Is de ronde al afgerond, dan zit die inleg allang in
+   potCarry verwerkt — dan niet nóg een keer optellen. */
 function sbSuperPotHuidig(s){
+  if(s.afgerond) return s.potCarry || 0;
   const betaaldNamen = Object.keys(s.betaald||{}).filter(n=>s.betaald[n]);
   return (s.potCarry||0) + betaaldNamen.length * (s.inleg||0);
 }
