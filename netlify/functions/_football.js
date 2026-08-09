@@ -84,3 +84,20 @@ export async function haalWedstrijd(store, ronde, matchId) {
   const data = await haalSpeelronde(store, ronde);
   return data.wedstrijden.find(w => String(w.id) === String(matchId)) || null;
 }
+
+// Directe hercontrole van één wedstrijd: eigen endpoint (/matches/{id}) en géén cache.
+// Bedoeld als sanity check als de speelronde-call blijft hangen op "nog te spelen" —
+// dan vraag je het de bron opnieuw, langs onze eigen opgeslagen kopie heen.
+export async function hercontroleerWedstrijd(matchId) {
+  const ruw = await fetchFootball(`${FOOTBALL_API}/matches/${matchId}`);
+  const m = ruw && (ruw.match || (Array.isArray(ruw.matches) ? ruw.matches[0] : null)) || ruw;
+  if (!m || !m.id) return null;
+  return naarWedstrijd(m);
+}
+
+// Cache van een speelronde weggooien, zodat de app bij de eerstvolgende weergave
+// verse gegevens ophaalt (inclusief de doelpunten, niet alleen de uitkomst).
+export async function vergeetSpeelrondeCache(store, ronde) {
+  if (!ronde) return;
+  try { await store.delete(`fd-wedstrijden-${ronde}`); } catch { /* cache weg is ook goed */ }
+}
