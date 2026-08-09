@@ -571,7 +571,8 @@
       <p class="uitleg" style="margin-bottom:0">De bunq.me-naam is het stukje achter bunq.me/ in je eigen betaallink. Vul je die in, dan krijgt elke speler een kant-en-klaar betaalverzoek te zien voor de inleg. Betalen kan iedereen via de link (ook zonder bunq).</p>
       <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
         <button class="knop primair" id="sbAfrekenMail">📧 Mail mij de weekend-afrekening</button>
-        <p class="uitleg" style="margin:8px 0 0">Overzicht van alle afgeronde bets, met per winnaar één netto bedrag — geen losse tikkies meer. De mail gaat naar je eigen mailbox.</p>
+        <p class="uitleg" style="margin:8px 0 0">Overzicht van alle afgeronde bets. Bovenaan staat de eindafrekening: per persoon één netto bedrag, zodat je precies weet wie je nog moet betalen. De mail gaat naar je eigen mailbox.</p>
+        <div id="sbBankOverzicht" style="margin-top:14px"></div>
       </div>
       <div class="status" id="sbAdminStatus"></div>
     </div>
@@ -3802,6 +3803,8 @@ function renderSbSaldo(){
     raak(verliezer, -w.inzet);
   });
 
+  renderSbBankOverzicht();
+
   const namen = Object.keys(saldo).sort((a,b)=> saldo[b]-saldo[a]);
   if(!namen.length){ $('sbSaldo').innerHTML = '<p class="uitleg">Nog geen afgeronde weddenschappen.</p>'; return; }
 
@@ -3812,6 +3815,34 @@ function renderSbSaldo(){
         return `<tr><td>${esc(n)}</td><td style="text-align:right;color:${kleur}">${v>0?'+':''}€${v}</td></tr>`;
       }).join('')
     + `</tbody></table>`;
+}
+
+/* De eindafrekening ook in de app tonen, zodat je niet hoeft te mailen om te zien
+   wie er nog geld van je krijgt. */
+function renderSbBankOverzicht(){
+  const el = $('sbBankOverzicht');
+  if(!el) return;
+  if(!isAdmin){ el.innerHTML = ''; return; }
+  const bank = sbBankAfrekening();
+  if(!bank.regels.length){ el.innerHTML = '<p class="uitleg" style="margin:0">Nog niets af te rekenen.</p>'; return; }
+
+  const kleur = v => v > 0 ? 'var(--amber)' : (v < 0 ? 'rgba(255,120,120,.9)' : 'var(--chalk-dim)');
+  const actie = r => r.netto > 0 ? `<strong style="color:var(--amber)">betaal €${r.netto}</strong>`
+                : r.netto < 0 ? '<span style="color:var(--chalk-dim)">zit in de kas</span>'
+                : '<span style="color:var(--chalk-dim)">niets doen</span>';
+
+  el.innerHTML = `<h3 style="margin:0 0 8px">Eindafrekening — wat moet de bank doen</h3>
+    <table class="stand"><tr><th>Deelnemer</th><th style="text-align:right">Ingelegd</th><th style="text-align:right">Te innen</th><th style="text-align:right">Uitkeren</th><th style="text-align:right">Netto</th><th>Actie</th></tr>`
+    + bank.regels.map(r=>`<tr>
+        <td>${esc(r.naam)}</td>
+        <td class="num">€${r.ingelegd}</td>
+        <td class="num">${r.teInnen?'€'+r.teInnen:'—'}</td>
+        <td class="num">€${r.uitkeren}</td>
+        <td class="num" style="color:${kleur(r.netto)}">${r.netto>0?'+€':r.netto<0?'-€':'€'}${Math.abs(r.netto)}</td>
+        <td>${actie(r)}</td>
+      </tr>`).join('')
+    + `</table>
+    <p class="uitleg" style="margin:8px 0 0">Totaal uit te betalen: <strong style="color:var(--amber)">€${bank.uitTeBetalen}</strong>${bank.nogTeInnen?` · nog te innen inzet: €${bank.nogTeInnen} (al verrekend in netto)`:''}${bank.openTerug?` · tegoed niet-gematchte uitdagingen: €${bank.openTerug}`:''}</p>`;
 }
 
 /* ---------- weekend-afrekening (admin) ---------- */
@@ -3838,6 +3869,49 @@ function sbAfrekening(){
   });
   return { uitbetalen, teruggeven, teInnen, bets };
 }
+/* Netto-positie per deelnemer tegenover de bank (= jij).
+   De losse bets lopen allemaal via één rekening: iedereen maakt zijn inzet over en
+   krijgt bij winst het dubbele terug. Dat heen-en-weer hoef je niet echt te doen —
+   alleen het verschil telt. Deze functie rekent dat verschil uit, zodat je in één
+   oogopslag ziet wie er geld van je moet krijgen.
+
+   netto = (wat de bank aan iemand verschuldigd is) - (wat de bank al van hem heeft)
+           - (wat hij nog moet inleggen)
+   netto > 0 -> uitbetalen. netto < 0 -> zit al in de kas, niets doen. */
+function sbBankAfrekening(){
+  const p = {};
+  const rij = n => (p[n] = p[n] || { naam:n, ingelegd:0, teInnen:0, uitkeren:0, open:0 });
+
+  sbData.weddenschappen.forEach(w=>{
+    // Niet-gematchte uitdaging waar wél voor betaald is: dat geld staat bij de bank
+    // en hoort terug zodra de wedstrijd voorbij is zonder tegenstander.
+    if(!w.tegenstander){
+      if(w.betaaldUitdager && sbGesloten(w)) rij(w.uitdager).open += w.inzet;
+      return;
+    }
+    const a = sbAfloop(w);
+    if(a.status !== 'klaar') return;
+    if(w.afgerekend) return;              // al uitbetaald, telt niet meer mee
+
+    [[w.uitdager, w.betaaldUitdager], [w.tegenstander, w.betaaldTegenstander]].forEach(([n, betaald])=>{
+      if(betaald) rij(n).ingelegd += w.inzet;
+      else        rij(n).teInnen  += w.inzet;
+    });
+
+    if(a.terug){ rij(w.uitdager).uitkeren += w.inzet; rij(w.tegenstander).uitkeren += w.inzet; }
+    else if(a.winnaar) rij(a.winnaar).uitkeren += w.inzet * 2;
+  });
+
+  const regels = Object.values(p).map(r=>({ ...r, netto: r.uitkeren - r.ingelegd - r.teInnen }))
+    .sort((a,b)=> b.netto - a.netto || a.naam.localeCompare(b.naam,'nl'));
+  return {
+    regels,
+    uitTeBetalen: regels.filter(r=>r.netto > 0).reduce((n,r)=>n + r.netto, 0),
+    nogTeInnen:   regels.reduce((n,r)=>n + r.teInnen, 0),
+    openTerug:    regels.reduce((n,r)=>n + r.open, 0)
+  };
+}
+
 function sbAfrekeningTekst(){
   const { uitbetalen, teruggeven, teInnen, bets } = sbAfrekening();
   const superRonde = sbSuper();
@@ -3850,9 +3924,42 @@ function sbAfrekeningTekst(){
   R.push('Peildatum: ' + new Date().toLocaleString('nl-NL', { weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' }));
   R.push('');
 
+  // ---- de eindafrekening: het enige blok dat je echt moet uitvoeren ----
+  const bank = sbBankAfrekening();
+  if(bank.regels.length){
+    const vul = (s,n) => String(s) + ' '.repeat(Math.max(0, n - String(s).length));
+    const bedrag = v => (v > 0 ? '+€' : v < 0 ? '-€' : '€') + Math.abs(v);
+
+    R.push('▼ EINDAFREKENING — WAT MOET JIJ ALS BANK DOEN');
+    const betalen = bank.regels.filter(r=>r.netto > 0);
+    if(betalen.length){
+      betalen.forEach(r=>{
+        const info = sbUitbetaal[r.naam] ? ' — ' + sbUitbetaal[r.naam] : ' — (geen uitbetaalinfo; terug op inleg-rekening)';
+        R.push('  BETAAL ' + eu(r.netto) + ' aan ' + r.naam + info);
+      });
+    } else {
+      R.push('  Niets uit te betalen.');
+    }
+    const gelijk = bank.regels.filter(r=>r.netto === 0 && !r.open);
+    if(gelijk.length) R.push('  Staat gelijk (niets doen): ' + gelijk.map(r=>r.naam).join(', '));
+    const verlies = bank.regels.filter(r=>r.netto < 0);
+    if(verlies.length) R.push('  Verlies zit al in de kas: ' + verlies.map(r=>r.naam + ' ' + eu(-r.netto)).join(', '));
+    if(bank.nogTeInnen) R.push('  LET OP: ' + eu(bank.nogTeInnen) + ' aan inzet is nog niet binnen — hierboven al verrekend.');
+    if(bank.openTerug)  R.push('  LET OP: ' + eu(bank.openTerug) + ' staat als tegoed voor niet-gematchte uitdagingen (wedstrijd voorbij, niemand haakte aan).');
+    R.push('');
+    R.push('  Onderbouwing:');
+    R.push('  ' + vul('deelnemer',14) + vul('ingelegd',10) + vul('te innen',10) + vul('uitkeren',10) + 'netto');
+    bank.regels.forEach(r=>{
+      R.push('  ' + vul(r.naam,14) + vul(eu(r.ingelegd),10) + vul(eu(r.teInnen),10) + vul(eu(r.uitkeren),10) + bedrag(r.netto));
+    });
+    R.push('  Totaal uit te betalen: ' + eu(bank.uitTeBetalen)
+      + ' | kas na afrekening: ' + eu(bank.regels.reduce((n,r)=>n + r.ingelegd - r.uitkeren, 0)));
+    R.push('');
+  }
+
   const winnaars = Object.keys(uitbetalen).sort((a,b)=> uitbetalen[b].totaal - uitbetalen[a].totaal);
   if(winnaars.length){
-    R.push('▼ UITBETALEN AAN WINNAARS (netto — één bedrag per persoon)');
+    R.push('▼ TER CONTROLE — BRUTO PER GEWONNEN BET (inzet + winst)');
     let som = 0;
     winnaars.forEach(n=>{
       const info = sbUitbetaal[n] ? ' — ' + sbUitbetaal[n] : ' — (geen uitbetaalinfo; terug op inleg-rekening)';
@@ -3869,7 +3976,7 @@ function sbAfrekeningTekst(){
 
   const terug = Object.keys(teruggeven).sort();
   if(terug.length){
-    R.push('▼ INZET TERUG (niemand had gelijk)');
+    R.push('▼ TER CONTROLE — INZET TERUG (niemand had gelijk)');
     terug.forEach(n=> R.push('• ' + n + ': ' + eu(teruggeven[n].totaal) + ' terug'));
     R.push('');
   }
