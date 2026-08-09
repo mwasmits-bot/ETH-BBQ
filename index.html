@@ -571,7 +571,9 @@
       <p class="uitleg" style="margin-bottom:0">De bunq.me-naam is het stukje achter bunq.me/ in je eigen betaallink. Vul je die in, dan krijgt elke speler een kant-en-klaar betaalverzoek te zien voor de inleg. Betalen kan iedereen via de link (ook zonder bunq).</p>
       <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
         <button class="knop primair" id="sbAfrekenMail">📧 Mail mij de weekend-afrekening</button>
-        <p class="uitleg" style="margin:8px 0 0">Overzicht van alle afgeronde bets. Bovenaan staat de eindafrekening: per persoon één netto bedrag, zodat je precies weet wie je nog moet betalen. De mail gaat naar je eigen mailbox.</p>
+        <button class="knop" id="sbUitslagMail">📣 Mail de uitslag naar de deelnemers</button>
+        <p class="uitleg" style="margin:8px 0 0">De eerste mail is voor jou alleen: alle afgeronde bets, met bovenaan de eindafrekening (per persoon één netto bedrag, zodat je weet wie je nog moet betalen).<br>
+        De tweede stuurt een uitslagenbericht naar de poule — alleen wedstrijduitslagen, winnaars en de tussenstand. Bedragen die jij als bank moet uitbetalen en uitbetaalgegevens staan er bewust <strong>niet</strong> in. Je krijgt eerst een bevestiging te zien met het aantal ontvangers.</p>
         <div id="sbBankOverzicht" style="margin-top:14px"></div>
       </div>
       <div class="status" id="sbAdminStatus"></div>
@@ -4044,6 +4046,103 @@ if($('sbAfrekenMail')) $('sbAfrekenMail').addEventListener('click', async ()=>{
     const j = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.fout || ('serverfout ' + r.status));
     toonStatus('sbAdminStatus','info', '✅ Afrekening gemaild naar ' + esc(j.afzender || 'je mailbox') + '.');
+  }catch(e){
+    toonStatus('sbAdminStatus','fout','Versturen mislukt: ' + esc(e.message));
+  }finally{ knop.disabled = false; knop.textContent = orig; }
+});
+
+/* Uitslagenbericht voor de poule. Bewust zonder bankafrekening en zonder
+   uitbetaalgegevens — dat is administratie van de beheerder, niet van de groep.
+   Alles wat hier in staat is ook gewoon in de app zichtbaar. */
+function sbUitslagTekstDeelnemers(){
+  const { bets } = sbAfrekening();
+  const s = sbSuper();
+  const heeftSuper = !!s.wedstrijd;
+  if(!bets.length && !heeftSuper) return null;
+  const eu = n => '€' + n;
+  const R = [];
+
+  R.push('Side Bets — uitslag' + (sbRonde ? ' speelronde ' + sbRonde : ''));
+  R.push('');
+
+  if(bets.length){
+    R.push('▼ UITSLAGEN');
+    bets.forEach(({ w, a }, i)=>{
+      const m = sbWedstrijdVan(w.matchId);
+      const score = (m && m.status === 'FINISHED') ? ' (' + m.thuisDoelpunten + '–' + m.uitDoelpunten + ')' : '';
+      const res = a.terug
+        ? 'niemand goed — beiden krijgen hun inzet terug'
+        : a.winnaar + ' wint ' + eu(w.inzet * 2);
+      R.push((i+1) + '. ' + w.thuis + '–' + w.uit + score);
+      R.push('   ' + w.uitdager + ' (' + SB_LABEL[w.keuzeUitdager] + ') vs '
+        + w.tegenstander + ' (' + SB_LABEL[w.keuzeTegenstander] + ') → ' + res);
+    });
+    R.push('');
+
+    // Tussenstand in euro's: winst/verlies per persoon over alle afgeronde bets.
+    const saldo = {};
+    sbData.weddenschappen.forEach(w=>{
+      if(!w.tegenstander) return;
+      const a = sbAfloop(w);
+      if(a.status !== 'klaar' || a.terug) return;
+      const verliezer = a.winnaar === w.uitdager ? w.tegenstander : w.uitdager;
+      saldo[a.winnaar] = (saldo[a.winnaar] || 0) + w.inzet;
+      saldo[verliezer] = (saldo[verliezer] || 0) - w.inzet;
+    });
+    const namen = Object.keys(saldo).sort((a,b)=> saldo[b] - saldo[a]);
+    if(namen.length){
+      R.push('▼ TUSSENSTAND IN EURO\u0027S');
+      namen.forEach(n=>{
+        const v = saldo[n];
+        R.push('• ' + n + ': ' + (v > 0 ? '+€' : v < 0 ? '-€' : '€') + Math.abs(v));
+      });
+      R.push('');
+    }
+  }
+
+  if(heeftSuper){
+    R.push('▼ SUPER SIDE BET');
+    R.push(s.wedstrijd.thuis + '–' + s.wedstrijd.uit);
+    if(s.afgerond){
+      const rec = (s.geschiedenis && s.geschiedenis[0]) || null;
+      R.push('Ruststand ' + s.uitslag.rustThuis + '-' + s.uitslag.rustUit
+        + ', eindstand ' + s.uitslag.eindThuis + '-' + s.uitslag.eindUit);
+      R.push(s.winnaars && s.winnaars.length
+        ? 'Winnaar' + (s.winnaars.length > 1 ? 's' : '') + ': ' + s.winnaars.join(', ')
+          + ' — ' + eu(rec ? rec.bedragPerWinnaar : 0) + (s.winnaars.length > 1 ? ' per persoon' : '')
+        : 'Niemand had de ruststand én eindstand exact goed — de pot rolt door naar de volgende ronde.');
+    } else {
+      R.push('Pot: ' + eu(sbSuperPotHuidig(s)) + '. De uitslag volgt zodra de beheerder de ronde afrondt.');
+    }
+    R.push('');
+  }
+
+  R.push('Alles staat ook in de app: ethscoritobbq.com');
+  return R.join('\n');
+}
+
+if($('sbUitslagMail')) $('sbUitslagMail').addEventListener('click', async ()=>{
+  if(!isAdmin || !adminWachtwoord){ toonStatus('sbAdminStatus','fout','Log eerst in als admin.'); return; }
+  const tekst = sbUitslagTekstDeelnemers();
+  if(!tekst){ toonStatus('sbAdminStatus','fout','Nog geen uitslagen om te mailen.'); return; }
+  const { metEmail, zonderEmail } = mailAdressen();
+  if(!metEmail.length){ toonStatus('sbAdminStatus','fout','Nog geen enkel e-mailadres bekend — vul ze in bij Instellingen → Deelnemers beheren.'); return; }
+
+  const onderwerp = 'Side Bets — uitslag' + (sbRonde ? ' speelronde ' + sbRonde : '');
+  const missen = zonderEmail.length ? `\n\nZonder e-mailadres (krijgen niets): ${zonderEmail.join(', ')}` : '';
+  if(!confirm(`Uitslag mailen naar ${metEmail.length} deelnemer(s)?\n\n${metEmail.map(m=>m.naam).join(', ')}${missen}\n\nOnderwerp: ${onderwerp}\n\nDit verstuurt de mail direct.`)) return;
+
+  const knop = $('sbUitslagMail'); const orig = knop.textContent;
+  knop.disabled = true; knop.textContent = '⏳ Versturen…';
+  try{
+    const r = await fetch(API_MAIL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-wachtwoord':adminWachtwoord },
+      body: JSON.stringify({ ontvangers: metEmail.map(m=>m.email), onderwerp, tekst, modus:'bcc' })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.fout || ('serverfout ' + r.status));
+    toonStatus('sbAdminStatus','info', '✅ Uitslag gemaild naar ' + (j.aantal || metEmail.length) + ' deelnemer(s).');
   }catch(e){
     toonStatus('sbAdminStatus','fout','Versturen mislukt: ' + esc(e.message));
   }finally{ knop.disabled = false; knop.textContent = orig; }
