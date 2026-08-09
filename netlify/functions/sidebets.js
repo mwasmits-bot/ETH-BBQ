@@ -15,7 +15,7 @@ const KEUZES = ["thuis", "gelijk", "uit"];
 
 const leegSuper = () => ({ inleg: 10, potCarry: 0, wedstrijd: null, inzendingen: {}, betaald: {}, afgerond: false, winnaars: null, uitslag: null, geschiedenis: [] });
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], uitslagen: {}, seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -55,6 +55,7 @@ export default async (req) => {
     sb.seizoen = { ...basis.seizoen, ...(sb.seizoen || {}) };
     sb.eindstand = { ...basis.eindstand, ...(sb.eindstand || {}) };
     sb.super = { ...basis.super, ...(sb.super || {}) };
+    sb.uitslagen = sb.uitslagen || {};
     return sb;
   };
 
@@ -97,8 +98,23 @@ export default async (req) => {
 
   try {
     // ================= ADMIN-ACTIES =================
-    if (["instellingen", "betaald", "afgerekend", "verwijder"].includes(body.actie)) {
+    if (["instellingen", "betaald", "afgerekend", "verwijder", "matchuitslag"].includes(body.actie)) {
       if (!isAdmin) return Response.json({ fout: "Alleen de beheerder kan dit." }, { status: 401 });
+
+      // Handmatige uitslag voor één wedstrijd — vangnet als football-data.org blijft
+      // hangen op TIMED terwijl de wedstrijd allang gespeeld is. Wint het van de API.
+      if (body.actie === "matchuitslag") {
+        const id = String(body.matchId || "");
+        if (!id) return Response.json({ fout: "Geen wedstrijd opgegeven." }, { status: 400 });
+        if (body.uitkomst === null || body.uitkomst === "") {
+          delete sb.uitslagen[id];
+        } else {
+          if (!KEUZES.includes(body.uitkomst)) {
+            return Response.json({ fout: "Ongeldige uitkomst — kies thuis, gelijk of uit." }, { status: 400 });
+          }
+          sb.uitslagen[id] = { uitkomst: body.uitkomst, gezetOp: new Date().toISOString() };
+        }
+      }
 
       if (body.actie === "instellingen") {
         if (typeof body.actief === "boolean") sb.actief = body.actief;

@@ -3521,10 +3521,17 @@ function sbWedstrijdVan(matchId){
 
 /* Bepaalt de afloop van één weddenschap.
    -> {status:'open'|'wacht'|'klaar', winnaar:naam|null, terug:bool} */
+/* Handmatige uitslag van de beheerder wint van de API — vangnet als football-data.org
+   blijft hangen op "nog te spelen" terwijl de wedstrijd allang gespeeld is. */
+function sbHandUitslag(matchId){
+  const u = (sbData.uitslagen || {})[String(matchId)];
+  return u ? u.uitkomst : null;
+}
+
 function sbAfloop(w){
   if(!w.tegenstander) return { status:'open', winnaar:null, terug:false };
   const m = sbWedstrijdVan(w.matchId);
-  const uitkomst = m ? m.uitkomst : null;
+  const uitkomst = sbHandUitslag(w.matchId) || (m ? m.uitkomst : null);
   if(!uitkomst) return { status:'wacht', winnaar:null, terug:false };
   if(uitkomst === w.keuzeUitdager) return { status:'klaar', winnaar:w.uitdager, terug:false };
   if(uitkomst === w.keuzeTegenstander) return { status:'klaar', winnaar:w.tegenstander, terug:false };
@@ -3603,6 +3610,10 @@ function renderSidebets(){
     let uitslag = '';
     if(m.status === 'FINISHED'){
       uitslag = `<strong style="color:var(--amber)">${m.thuisDoelpunten}–${m.uitDoelpunten}</strong>`;
+    } else if(sbHandUitslag(m.id)){
+      const h = sbHandUitslag(m.id);
+      const tekst = h==='thuis' ? (m.thuis+' wint') : h==='uit' ? (m.uit+' wint') : 'gelijkspel';
+      uitslag = `<strong style="color:var(--amber)" title="Handmatig door de beheerder gezet">${esc(tekst)} ✎</strong>`;
     } else if(m.status === 'IN_PLAY' || m.status === 'PAUSED'){
       uitslag = `<span style="color:var(--amber)">bezig…</span>`;
     } else {
@@ -3744,12 +3755,28 @@ function renderSidebets(){
          </div>`
       : (dicht ? '' : `<p class="uitleg" style="margin:8px 0 0">Meld je hierboven aan om mee te doen.</p>`);
 
+    // Admin-vangnet: alleen tonen als de wedstrijd volgens de klok is begonnen maar de
+    // API nog geen uitkomst geeft (of als er al handmatig iets is gezet).
+    const hand = sbHandUitslag(m.id);
+    const apiKlaar = m.status === 'FINISHED' && m.uitkomst;
+    const adminUitslag = (isAdmin && dicht && (!apiKlaar || hand))
+      ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)">
+           <div style="color:var(--chalk-dim);font-size:13px;margin-bottom:6px">
+             ${hand ? `⚠ Handmatige uitslag actief: <strong>${lbl(hand)}</strong>${apiKlaar?' (de API geeft inmiddels zelf een uitslag — je kunt dit wissen)':''}.`
+                    : 'De officiële uitslag is er nog niet. Blijft dit hangen, zet hem dan hier zelf — dit telt meteen mee voor de weddenschappen en de afrekening.'}
+           </div>
+           <div style="display:flex;gap:6px;flex-wrap:wrap">
+             ${['thuis','gelijk','uit'].map(k=>`<button class="knop${hand===k?' primair':''}" data-matchuitslag="${m.id}" data-uitkomst="${k}">${lbl(k)}</button>`).join('')}
+             ${hand ? `<button class="knop" data-matchuitslag="${m.id}" data-uitkomst="">Wissen</button>` : ''}
+           </div>
+         </div>` : '';
+
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <strong>${esc(m.thuis)} — ${esc(m.uit)}</strong>
         <span>${uitslag}</span>
       </div>
-      ${openHtml}${matchHtml}${plaatsHtml}
+      ${openHtml}${matchHtml}${plaatsHtml}${adminUitslag}
     </div>`;
   }).join('');
 
@@ -4673,6 +4700,18 @@ document.addEventListener('click', async (ev)=>{
   if(t.dataset.afgerekend){
     try{
       await sbPost({ actie:'afgerekend', id:t.dataset.afgerekend, waarde:t.dataset.waarde==='1' });
+      renderSidebets();
+    }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
+    return;
+  }
+  if(t.dataset.matchuitslag !== undefined){
+    const k = t.dataset.uitkomst;
+    const m = sbWedstrijdVan(Number(t.dataset.matchuitslag));
+    const lbl = k==='thuis' ? ((m?m.thuis:'thuis')+' wint') : k==='uit' ? ((m?m.uit:'uit')+' wint') : 'gelijkspel';
+    if(k && !confirm(`Uitslag handmatig vastzetten op "${lbl}"? Alle weddenschappen op deze wedstrijd worden meteen afgerekend op basis hiervan.`)) return;
+    try{
+      await sbPost({ actie:'matchuitslag', matchId:String(t.dataset.matchuitslag), uitkomst:k || null });
+      toonStatus('sbStatus','info', k ? ('Uitslag handmatig gezet: ' + esc(lbl)) : 'Handmatige uitslag gewist — de API is weer leidend.');
       renderSidebets();
     }catch(e){ toonStatus('sbStatus','fout', esc(e.message)); }
     return;
