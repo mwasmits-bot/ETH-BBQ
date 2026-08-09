@@ -22,11 +22,19 @@ const escapeHtml = (s) => String(s)
   .replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;");
 
+// Losse http(s)-adressen klikbaar maken. Draait ná escapeHtml, dus op tekst waarin
+// < > & " al onschadelijk zijn; de URL zelf kan daardoor geen HTML injecteren.
+// Sluitende leestekens laten we buiten de link (anders plakt een punt eraan vast).
+function linkjes(veiligeTekst) {
+  return veiligeTekst.replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]]/g, (url) =>
+    `<a href="${url}" style="color:#4d7c0f;text-decoration:underline;">${url}</a>`);
+}
+
 // Platte tekst uit de app omzetten naar nette HTML-alinea's.
 function tekstNaarHtml(tekst) {
   return String(tekst)
     .split(/\n{2,}/)
-    .map(blok => `<p style="margin:0 0 16px 0;">${escapeHtml(blok).replace(/\n/g, "<br>")}</p>`)
+    .map(blok => `<p style="margin:0 0 16px 0;">${linkjes(escapeHtml(blok)).replace(/\n/g, "<br>")}</p>`)
     .join("");
 }
 
