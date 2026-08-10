@@ -7,15 +7,39 @@
 // Deelnemers schrijven met hun eigen wachtwoord (uit data.teams), admin met ADMIN_WACHTWOORD.
 // Alle controles gebeuren serverside: een aangepaste frontend kan de regels niet omzeilen.
 import { getStore } from "@netlify/blobs";
-import { meldAdmin } from "./_notify.js";
+import { meldAdmin, meldAbonnees } from "./_notify.js";
 import { haalWedstrijd } from "./_football.js";
 
 const MAX_INZET = 100;
 const KEUZES = ["thuis", "gelijk", "uit"];
+const KEUZE_LABEL = { thuis: "thuis wint", gelijk: "gelijkspel", uit: "uit wint" };
+const APP_URL = "https://ethscoritobbq.com";
+
+const BET_TEASERS = [
+  "Durf jij het aan, of laat je deze lopen?",
+  "Er ligt weer geld op straat — wie pakt 'm?",
+  "Wie stilzit wint niks. Aanhaken kan in twee klikken.",
+  "De pot wordt nooit groter door toe te kijken.",
+  "Straks heeft iemand anders 'm al gepakt…"
+];
+const kiesTeaser = () => BET_TEASERS[Math.floor(Math.random() * BET_TEASERS.length)];
+
+function bouwBetTeaserTekst({ soort, wie, tegenover, wedstrijd, bedrag, keuze }) {
+  const kern = soort === "haak"
+    ? `${tegenover} is zojuist aangehaakt bij de uitdaging van ${wie} op ${wedstrijd.thuis} - ${wedstrijd.uit}: €${bedrag} p.p. op het spel.`
+    : `${wie} heeft zojuist een nieuwe uitdaging geplaatst op ${wedstrijd.thuis} - ${wedstrijd.uit}: €${bedrag} op "${KEUZE_LABEL[keuze] || keuze}".`;
+  const oproep = soort === "haak"
+    ? "Deze is net vergeven, maar er komt zo weer een nieuwe kans voorbij — hou 'm in de gaten."
+    : "Nog niemand tegenover — haak nu aan voordat iemand anders het doet.";
+
+  return `${kern}\n\n${kiesTeaser()} ${oproep}\n\n👉 Naar de app: ${APP_URL}\n\n`
+    + `Doe je trouwens al mee met de Super Side Bet (voorspel ruststand én eindstand van één wedstrijd, winnaar pakt de hele pot) of Scorito King (voorspel de kampioen en de bbq-loser van de poule)? Ook daar liggen potten klaar om gewonnen te worden.\n\n`
+    + `Je krijgt deze mail omdat je je hebt aangemeld voor Side Bet-meldingen. Afmelden kan met één klik in de app, bij "Per speelronde" → 🔔 Meldingen.`;
+}
 
 const leegSuper = () => ({ inleg: 10, potCarry: 0, wedstrijd: null, inzendingen: {}, betaald: {}, afgerond: false, winnaars: null, uitslag: null, geschiedenis: [] });
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], uitslagen: {}, seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], uitslagen: {}, betAbonnees: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -95,6 +119,15 @@ export default async (req) => {
 
   const bewaar = async () => { await store.set("sidebets", JSON.stringify(sb)); };
   const schoonAntwoord = (o) => { const { uitbetaal, ...p } = o; p.heeftUitbetaal = Object.keys(uitbetaal || {}); p.eindstand = eindstandPubliek(p.eindstand); p.super = superPubliek(p.super); return p; };
+
+  // Stuurt de "iemand plaatst een bet"-mail naar alle abonnees, behalve degene die
+  // de actie zelf net uitvoerde (die weet het al).
+  const meldBetAbonnees = async (soort, gegevens) => {
+    const namen = (sb.betAbonnees || []).filter(n => n !== gegevens.uitgesloten);
+    const emails = namen.map(n => teams[n] && teams[n].email).filter(Boolean);
+    if (!emails.length) return;
+    await meldAbonnees(emails, gegevens.onderwerp, bouwBetTeaserTekst({ soort, ...gegevens }));
+  };
 
   try {
     // ================= ADMIN-ACTIES =================
@@ -460,6 +493,21 @@ export default async (req) => {
       return Response.json({ ok: true, uitbetaal: eigen ? { [deelnemer]: eigen } : {} });
     }
 
+    // Aan-/afmelden voor de "iemand plaatst een bet"-mail. Geldt voor alle speelrondes,
+    // niet alleen de ronde die de deelnemer nu bekijkt.
+    if (body.actie === "bet-abonneren") {
+      const { deelnemer, wachtwoord, aan } = body;
+      const fout = controleerDeelnemer(deelnemer, wachtwoord);
+      if (fout) return Response.json({ fout }, { status: 401 });
+      const naam = String(deelnemer || "").trim();
+      if (!naam) return Response.json({ fout: "Geen deelnemer opgegeven." }, { status: 400 });
+      const set = new Set(sb.betAbonnees || []);
+      if (aan) set.add(naam); else set.delete(naam);
+      sb.betAbonnees = [...set];
+      await bewaar();
+      return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
+    }
+
     // ================= UITDAGING PLAATSEN =================
     if (body.actie === "plaats") {
       const { deelnemer, wachtwoord, wedstrijd, keuze, inzet } = body;
@@ -516,6 +564,10 @@ export default async (req) => {
         `Side bet: nieuwe uitdaging van ${deelnemer}`,
         `${deelnemer} heeft €${bedrag} ingezet op "${keuze}" bij ${wedstrijd.thuis} - ${wedstrijd.uit}.`
       );
+      await meldBetAbonnees("plaats", {
+        onderwerp: `🔥 Nieuwe Side Bet: ${deelnemer} daagt uit op ${wedstrijd.thuis} - ${wedstrijd.uit}`,
+        wie: deelnemer, wedstrijd, bedrag, keuze, uitgesloten: deelnemer
+      });
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 
@@ -550,6 +602,10 @@ export default async (req) => {
         `Side bet: ${deelnemer} haakt aan bij ${w.uitdager}`,
         `${deelnemer} heeft de uitdaging van ${w.uitdager} (€${w.inzet}, ${w.thuis} - ${w.uit}) aangenomen met keuze "${keuze}".`
       );
+      await meldBetAbonnees("haak", {
+        onderwerp: `⚔️ Side Bet gematcht: ${deelnemer} vs ${w.uitdager} op ${w.thuis} - ${w.uit}`,
+        wie: w.uitdager, tegenover: deelnemer, wedstrijd: w, bedrag: w.inzet, keuze: w.keuzeUitdager, uitgesloten: deelnemer
+      });
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }
 

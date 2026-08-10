@@ -609,6 +609,18 @@
       </div>
     </div>
 
+    <!-- meldingen bij nieuwe bets -->
+    <div class="card sb-ronde-view" id="sbMeldingCard" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div>
+          <strong>🔔 Meldingen</strong>
+          <p class="uitleg" style="margin:4px 0 0">Krijg een mailtje zodra iemand een Side Bet plaatst of aanhaakt — voor alle speelrondes, niet alleen deze.</p>
+        </div>
+        <button class="knop" id="sbMeldingToggle">—</button>
+      </div>
+      <div class="status" id="sbMeldingStatus"></div>
+    </div>
+
     <!-- wedstrijden -->
     <div class="card sb-ronde-view">
       <h2>Wedstrijden</h2>
@@ -3787,11 +3799,32 @@ function renderSidebets(){
   $('sbWedstrijden').innerHTML = rows || '<p class="uitleg">Geen wedstrijden gevonden voor deze speelronde.</p>';
 
   renderSbSaldo();
+  renderSbMelding();
   renderSbSeizoen();
   renderSbEindstand();
   renderSbSuper();
   sbToonView();
 }
+
+function renderSbMelding(){
+  const kaart = $('sbMeldingCard');
+  if(!kaart) return;
+  if(!sbSessie){ kaart.style.display = 'none'; return; }
+  kaart.style.display = '';
+  const aan = (sbData.betAbonnees||[]).includes(sbSessie);
+  const knop = $('sbMeldingToggle');
+  knop.textContent = aan ? '🔕 Uitschrijven' : '🔔 Meld me bij nieuwe bets';
+  knop.classList.toggle('primair', !aan);
+}
+if($('sbMeldingToggle')) $('sbMeldingToggle').addEventListener('click', async ()=>{
+  if(!sbSessie){ toonStatus('sbMeldingStatus','fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
+  const aan = (sbData.betAbonnees||[]).includes(sbSessie);
+  try{
+    await sbPost({ actie:'bet-abonneren', deelnemer:sbSessie, wachtwoord:sbSessieWw, aan: !aan });
+    renderSbMelding();
+    toonStatus('sbMeldingStatus','info', aan ? 'Uitgeschreven — je krijgt geen meldingen meer.' : '✅ Aangemeld! Je krijgt voortaan een mail als iemand een Side Bet plaatst of aanhaakt.');
+  }catch(e){ toonStatus('sbMeldingStatus','fout', esc(e.message)); }
+});
 
 function renderSbSaldo(){
   const saldo = {};

@@ -38,7 +38,7 @@ function tekstNaarHtml(tekst) {
     .join("");
 }
 
-function bouwHtml({ tekst, logoUrl, afzenderNaam }) {
+export function bouwHtml({ tekst, logoUrl, afzenderNaam }) {
   return `<!DOCTYPE html>
 <html lang="nl">
 <body style="margin:0;padding:0;background:#f3f4f6;">
