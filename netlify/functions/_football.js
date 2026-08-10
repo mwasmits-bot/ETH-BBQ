@@ -51,18 +51,8 @@ function naarWedstrijd(m) {
   };
 }
 
-// Speelronde ophalen (huidige, of een specifiek rondenummer).
-export async function haalSpeelronde(store, gevraagdRonde) {
-  const comp = await cachedGet(
-    store,
-    "fd-competitie",
-    () => fetchFootball(`${FOOTBALL_API}/competitions/${EREDIVISIE_ID}`),
-    () => 6 * 60 * 60 * 1000
-  );
-  const huidigeRonde = (comp.currentSeason && comp.currentSeason.currentMatchday) || 1;
-  const ronde = Number.isFinite(gevraagdRonde) && gevraagdRonde > 0 ? gevraagdRonde : huidigeRonde;
-
-  const ruw = await cachedGet(
+async function haalRondeRuw(store, ronde) {
+  return cachedGet(
     store,
     `fd-wedstrijden-${ronde}`,
     () => fetchFootball(`${FOOTBALL_API}/competitions/${EREDIVISIE_ID}/matches?matchday=${ronde}`),
@@ -72,6 +62,45 @@ export async function haalSpeelronde(store, gevraagdRonde) {
       return allesKlaar ? 12 * 60 * 60 * 1000 : 2 * 60 * 1000; // 12 uur vs 2 minuten
     }
   );
+}
+
+function rondeIsVoorbij(ruw) {
+  const lijst = (ruw && ruw.matches) || [];
+  return lijst.length > 0 && lijst.every(m => ["FINISHED", "AWARDED", "CANCELLED", "POSTPONED"].includes(m.status));
+}
+
+// Speelronde ophalen (huidige, of een specifiek rondenummer).
+//
+// football-data.org's currentMatchday blijft soms op de net afgelopen ronde staan
+// totdat zij hun schema bijwerken (het bleef bijv. op 1 staan terwijl alle
+// wedstrijden van ronde 1 allang FINISHED waren). Wordt er geen expliciete ronde
+// gevraagd — dus bij het gewoon openen van de app — dan stappen we zelf door naar
+// de eerstvolgende ronde die nog niet volledig afgelopen is, zodat je op maandag
+// niet naar een weekend staat te kijken dat al voorbij is. Vraagt iemand (bijv. via
+// ‹ vorige / volgende ›) expliciet een rondenummer, dan tonen we precies dat.
+export async function haalSpeelronde(store, gevraagdRonde) {
+  const comp = await cachedGet(
+    store,
+    "fd-competitie",
+    () => fetchFootball(`${FOOTBALL_API}/competitions/${EREDIVISIE_ID}`),
+    () => 6 * 60 * 60 * 1000
+  );
+  const huidigeRonde = (comp.currentSeason && comp.currentSeason.currentMatchday) || 1;
+
+  let ronde, ruw;
+  if (Number.isFinite(gevraagdRonde) && gevraagdRonde > 0) {
+    ronde = gevraagdRonde;
+    ruw = await haalRondeRuw(store, ronde);
+  } else {
+    ronde = huidigeRonde;
+    ruw = await haalRondeRuw(store, ronde);
+    for (let stap = 0; stap < 5 && rondeIsVoorbij(ruw); stap++) {
+      const volgende = await haalRondeRuw(store, ronde + 1);
+      if (!(volgende.matches || []).length) break;   // buiten het seizoen: hier stoppen
+      ronde += 1;
+      ruw = volgende;
+    }
+  }
 
   const wedstrijden = (ruw.matches || []).map(naarWedstrijd)
     .sort((a, b) => new Date(a.aftrap) - new Date(b.aftrap));
