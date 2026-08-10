@@ -3863,9 +3863,14 @@ function renderSbBankOverzicht(){
   if(!bank.regels.length){ el.innerHTML = '<p class="uitleg" style="margin:0">Nog niets af te rekenen.</p>'; return; }
 
   const kleur = v => v > 0 ? 'var(--amber)' : (v < 0 ? 'rgba(255,120,120,.9)' : 'var(--chalk-dim)');
-  const actie = r => r.netto > 0 ? `<strong style="color:var(--amber)">betaal €${r.netto}</strong>`
+  const terugNotitie = r => r.terugTeGeven ? `<div style="color:var(--chalk-dim);font-size:12px">w.o. €${r.terugTeGeven} inleg terug (gelijke/foute uitslag)</div>` : '';
+  const actie = r => {
+    const bedrag = sbBankActieBedrag(r);
+    const basis = bedrag > 0 ? `<strong style="color:var(--amber)">betaal €${bedrag}</strong>`
                 : r.netto < 0 ? '<span style="color:var(--chalk-dim)">zit in de kas</span>'
                 : '<span style="color:var(--chalk-dim)">niets doen</span>';
+    return basis + terugNotitie(r);
+  };
 
   el.innerHTML = `<h3 style="margin:0 0 8px">Eindafrekening — wat moet de bank doen</h3>
     <table class="stand"><tr><th>Deelnemer</th><th style="text-align:right">Ingelegd</th><th style="text-align:right">Te innen</th><th style="text-align:right">Uitkeren</th><th style="text-align:right">Netto</th><th>Actie</th></tr>`
@@ -3878,7 +3883,7 @@ function renderSbBankOverzicht(){
         <td>${actie(r)}</td>
       </tr>`).join('')
     + `</table>
-    <p class="uitleg" style="margin:8px 0 0">Totaal uit te betalen: <strong style="color:var(--amber)">€${bank.uitTeBetalen}</strong>${bank.nogTeInnen?` · nog te innen inzet: €${bank.nogTeInnen} (al verrekend in netto)`:''}${bank.openTerug?` · tegoed niet-gematchte uitdagingen: €${bank.openTerug}`:''}</p>`;
+    <p class="uitleg" style="margin:8px 0 0">Totaal uit te betalen: <strong style="color:var(--amber)">€${bank.uitTeBetalen}</strong>${bank.totaalTerug?` (waarvan €${bank.totaalTerug} inleg-teruggave wegens gelijke/foute uitslag)`:''}${bank.nogTeInnen?` · nog te innen inzet: €${bank.nogTeInnen} (al verrekend in netto)`:''}${bank.openTerug?` · tegoed niet-gematchte uitdagingen: €${bank.openTerug}`:''}</p>`;
 }
 
 /* ---------- weekend-afrekening (admin) ---------- */
@@ -3916,7 +3921,7 @@ function sbAfrekening(){
    netto > 0 -> uitbetalen. netto < 0 -> zit al in de kas, niets doen. */
 function sbBankAfrekening(){
   const p = {};
-  const rij = n => (p[n] = p[n] || { naam:n, ingelegd:0, teInnen:0, uitkeren:0, open:0 });
+  const rij = n => (p[n] = p[n] || { naam:n, ingelegd:0, teInnen:0, uitkeren:0, terugTeGeven:0, open:0 });
 
   sbData.weddenschappen.forEach(w=>{
     // Niet-gematchte uitdaging waar wél voor betaald is: dat geld staat bij de bank
@@ -3934,7 +3939,17 @@ function sbBankAfrekening(){
       else        rij(n).teInnen  += w.inzet;
     });
 
-    if(a.terug){ rij(w.uitdager).uitkeren += w.inzet; rij(w.tegenstander).uitkeren += w.inzet; }
+    if(a.terug){
+      // Foute/gelijke uitslag: geen winnaar, dus geen uitbetaling — alleen de eigen
+      // inleg terug, en dan alléén voor wie 'm ook echt betaald had (anders is er
+      // niets om terug te geven). terugTeGeven zit al in uitkeren/netto verwerkt;
+      // we bewaren 'm apart zodat de eindafrekening expliciet kan tonen wáárom
+      // iemand een bedrag krijgt, in plaats van dat het verdwijnt in "niets doen".
+      rij(w.uitdager).uitkeren += w.inzet;
+      rij(w.tegenstander).uitkeren += w.inzet;
+      if(w.betaaldUitdager)     rij(w.uitdager).terugTeGeven += w.inzet;
+      if(w.betaaldTegenstander) rij(w.tegenstander).terugTeGeven += w.inzet;
+    }
     else if(a.winnaar) rij(a.winnaar).uitkeren += w.inzet * 2;
   });
 
@@ -3942,10 +3957,23 @@ function sbBankAfrekening(){
     .sort((a,b)=> b.netto - a.netto || a.naam.localeCompare(b.naam,'nl'));
   return {
     regels,
-    uitTeBetalen: regels.filter(r=>r.netto > 0).reduce((n,r)=>n + r.netto, 0),
+    uitTeBetalen: regels.reduce((n,r)=>n + sbBankActieBedrag(r), 0),
     nogTeInnen:   regels.reduce((n,r)=>n + r.teInnen, 0),
-    openTerug:    regels.reduce((n,r)=>n + r.open, 0)
+    openTerug:    regels.reduce((n,r)=>n + r.open, 0),
+    totaalTerug:  regels.reduce((n,r)=>n + r.terugTeGeven, 0)
   };
+}
+/* Wat de bank fysiek aan deze persoon moet overmaken. Bij netto > 0 is dat gewoon
+   het netto bedrag (daar zit een eventuele teruggave al in verrekend). Staat de
+   netto op 0 puur omdat de enige transactie een betaalde, teruggegeven inzet was
+   (geen andere winst/verlies om tegen weg te strepen), dan moet die teruggave
+   alsnog echt overgemaakt worden — anders houdt de bank geld vast dat niet van
+   haar is. Bij een negatieve netto is er niets te betalen: het verlies elders
+   dekt de teruggave al. */
+function sbBankActieBedrag(r){
+  if(r.netto > 0) return r.netto;
+  if(r.netto === 0) return r.terugTeGeven || 0;
+  return 0;
 }
 
 function sbAfrekeningTekst(){
@@ -3967,21 +3995,23 @@ function sbAfrekeningTekst(){
     const bedrag = v => (v > 0 ? '+€' : v < 0 ? '-€' : '€') + Math.abs(v);
 
     R.push('▼ EINDAFREKENING — WAT MOET JIJ ALS BANK DOEN');
-    const betalen = bank.regels.filter(r=>r.netto > 0);
+    const betalen = bank.regels.filter(r=>sbBankActieBedrag(r) > 0);
     if(betalen.length){
       betalen.forEach(r=>{
         const info = sbUitbetaal[r.naam] ? ' — ' + sbUitbetaal[r.naam] : ' — (geen uitbetaalinfo; terug op inleg-rekening)';
-        R.push('  BETAAL ' + eu(r.netto) + ' aan ' + r.naam + info);
+        const terugNote = r.terugTeGeven ? ' (w.o. ' + eu(r.terugTeGeven) + ' inleg terug — gelijke/foute uitslag)' : '';
+        R.push('  BETAAL ' + eu(sbBankActieBedrag(r)) + ' aan ' + r.naam + terugNote + info);
       });
     } else {
       R.push('  Niets uit te betalen.');
     }
-    const gelijk = bank.regels.filter(r=>r.netto === 0 && !r.open);
+    const gelijk = bank.regels.filter(r=>sbBankActieBedrag(r) === 0 && r.netto === 0 && !r.open);
     if(gelijk.length) R.push('  Staat gelijk (niets doen): ' + gelijk.map(r=>r.naam).join(', '));
     const verlies = bank.regels.filter(r=>r.netto < 0);
-    if(verlies.length) R.push('  Verlies zit al in de kas: ' + verlies.map(r=>r.naam + ' ' + eu(-r.netto)).join(', '));
+    if(verlies.length) R.push('  Verlies zit al in de kas: ' + verlies.map(r=>r.naam + (r.terugTeGeven?' (w.o. '+eu(r.terugTeGeven)+' inleg terug, al verrekend met verlies elders)':'') + ' ' + eu(-r.netto)).join(', '));
     if(bank.nogTeInnen) R.push('  LET OP: ' + eu(bank.nogTeInnen) + ' aan inzet is nog niet binnen — hierboven al verrekend.');
     if(bank.openTerug)  R.push('  LET OP: ' + eu(bank.openTerug) + ' staat als tegoed voor niet-gematchte uitdagingen (wedstrijd voorbij, niemand haakte aan).');
+    if(bank.totaalTerug) R.push('  Waarvan in totaal ' + eu(bank.totaalTerug) + ' inleg-teruggave wegens gelijke/foute uitslag (al verrekend in de bedragen hierboven).');
     R.push('');
     R.push('  Onderbouwing:');
     R.push('  ' + vul('deelnemer',14) + vul('ingelegd',10) + vul('te innen',10) + vul('uitkeren',10) + 'netto');
