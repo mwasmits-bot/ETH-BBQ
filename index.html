@@ -835,6 +835,7 @@
           <select id="mailKeuze">
             <option value="tussenstand">📊 Tussenstand</option>
             <option value="ronde">⚡ Laatste ronde</option>
+            <option value="highlights">🎉 Weekend-highlights</option>
             <option value="orakel">🔮 Orakel-herinnering</option>
             <option value="vrij">✍️ Vrij bericht</option>
           </select>
@@ -1347,6 +1348,126 @@ Groet,
 De organisatie`;
   return { onderwerp:`⚡ Ronde ${nr} — de uitslag`, tekst };
 }
+
+/* ---------- weekend-highlights: feitjes, uitschieters, verrassingen ---------- */
+/* Deelnemer-kant: alles hieronder werkt met wat er nu al is (weekscores per ronde).
+   Speler-kant (wie was de uitblinker in iemands selectie) activeert zichzelf zodra
+   een deelnemer een squad heeft (Selecties) én de spelerspunten van die ronde zijn
+   ingevoerd — is dat er nog niet, dan laat de mail dat stuk gewoon weg. */
+function highlightsRonde(nr){
+  const scores = (data.rounds[nr] || {}).scores || {};
+  const namen = Object.keys(scores);
+  if(!namen.length) return null;
+
+  const { winnaars, verliezers } = extremen(scores);
+  const maxP = Math.max(...Object.values(scores)), minP = Math.min(...Object.values(scores));
+
+  // Verrassing/tegenvaller: grootste afwijking t.o.v. je eigen gemiddelde tot nu toe
+  // (een debuutronde heeft nog geen gemiddelde om tegen af te zetten, telt dus niet mee).
+  const eerdereRondes = rondeNummers().filter(x=>x<nr && Object.keys((data.rounds[x]||{}).scores||{}).length);
+  let verrassing = null, tegenvaller = null;
+  namen.forEach(n=>{
+    const eerder = eerdereRondes.map(x=>data.rounds[x].scores[n]).filter(v=>v!==undefined);
+    if(!eerder.length) return;
+    const gem = eerder.reduce((a,b)=>a+b,0) / eerder.length;
+    const afwijking = Math.round((scores[n]-gem)*10)/10;
+    const info = { naam:n, afwijking, score:scores[n], gemiddelde:Math.round(gem*10)/10 };
+    if(afwijking > 0 && (!verrassing || afwijking > verrassing.afwijking)) verrassing = info;
+    if(afwijking < 0 && (!tegenvaller || afwijking < tegenvaller.afwijking)) tegenvaller = info;
+  });
+
+  // Klassementswissels: alleen zinvol als deze ronde meetelt voor de prijzen.
+  let stijger = null, daler = null, koploper = null, gatKop = null;
+  if((data.rounds[nr]||{}).telt){
+    const tellingRondes = rondeNummers().filter(x=>(data.rounds[x]||{}).telt);
+    const optellen = lijst => { const t={}; lijst.forEach(x=>Object.entries(data.rounds[x].scores||{}).forEach(([n,p])=>t[n]=(t[n]||0)+p)); return t; };
+    const totVoor = optellen(tellingRondes.filter(x=>x<nr));
+    const totNa = optellen(tellingRondes.filter(x=>x<=nr));
+    const namenNa = Object.keys(totNa);
+    const rangVoor = {}, rangNa = {};
+    [...namenNa].sort((a,b)=>(totVoor[b]||0)-(totVoor[a]||0)).forEach((n,i)=>rangVoor[n]=i+1);
+    [...namenNa].sort((a,b)=>(totNa[b]||0)-(totNa[a]||0)).forEach((n,i)=>rangNa[n]=i+1);
+    namenNa.forEach(n=>{
+      if(totVoor[n]===undefined) return;   // nieuw dit seizoen (of eerste telronde) — geen shift te melden
+      const shift = rangVoor[n]-rangNa[n]; // positief = gestegen
+      if(shift>0 && (!stijger || shift>stijger.shift)) stijger = { naam:n, shift, van:rangVoor[n], naar:rangNa[n] };
+      if(shift<0 && (!daler  || shift<daler.shift))    daler  = { naam:n, shift, van:rangVoor[n], naar:rangNa[n] };
+    });
+    const gesorteerdNa = [...namenNa].sort((a,b)=>(totNa[b]||0)-(totNa[a]||0));
+    koploper = gesorteerdNa[0] || null;
+    if(gesorteerdNa.length>1) gatKop = (totNa[gesorteerdNa[0]]||0) - (totNa[gesorteerdNa[1]]||0);
+  }
+
+  // Speler-kant: alleen deelnemers mét selectie én bekende spelerspunten voor deze ronde.
+  let besteSpeler=null, slechtsteSpeler=null, grootsteMiskleun=null, perfecteWeek=[];
+  if(Object.keys(data.spelerpunten[nr]||{}).length){
+    const metSquad = Object.keys(data.teams).filter(d=>(data.teams[d].squad||[]).length);
+    const spelerPunten = {};
+    metSquad.forEach(d=> data.teams[d].squad.forEach(s=>{
+      const p = puntenVoorSpeler(nr, s.naam);
+      if(p!==undefined) spelerPunten[s.naam] = p;
+    }));
+    Object.entries(spelerPunten).forEach(([n,p])=>{
+      if(!besteSpeler || p > spelerPunten[besteSpeler]) besteSpeler = n;
+      if(!slechtsteSpeler || p < spelerPunten[slechtsteSpeler]) slechtsteSpeler = n;
+    });
+    metSquad.forEach(d=>{
+      const t = tipData(nr, d);
+      if(t.fout || t.verschil===null) return;
+      if(t.verschil===0) perfecteWeek.push(d);
+      else if(!grootsteMiskleun || t.verschil>grootsteMiskleun.verschil) grootsteMiskleun = { naam:d, verschil:t.verschil };
+    });
+    if(besteSpeler) besteSpeler = { naam:besteSpeler, punten:spelerPunten[besteSpeler] };
+    if(slechtsteSpeler) slechtsteSpeler = { naam:slechtsteSpeler, punten:spelerPunten[slechtsteSpeler] };
+  }
+
+  return {
+    winnaars, verliezers, maxP, minP, verrassing, tegenvaller,
+    stijger, daler, koploper, gatKop,
+    superweekend: !!(data.rounds[nr]||{}).superweekend,
+    besteSpeler, slechtsteSpeler, grootsteMiskleun, perfecteWeek
+  };
+}
+function tplHighlights(){
+  const nr = laatsteRondeMetScores();
+  if(nr===null) return { onderwerp:'🎉 Weekend-highlights', tekst:'Er is nog geen ronde met scores ingevoerd.' };
+  const h = highlightsRonde(nr);
+  if(!h) return { onderwerp:'🎉 Weekend-highlights', tekst:'Geen scores gevonden voor ronde '+nr+'.' };
+
+  const rec = records();
+  const nieuwRecordHoog = !!(rec && rec.hoog.some(p=>p.ronde===nr));
+  const nieuwRecordLaag = !!(rec && rec.laag.some(p=>p.ronde===nr));
+
+  const R = [];
+  R.push('Mannen,');
+  R.push('');
+  R.push('De hoogte- en dieptepunten van speelronde '+nr+(h.superweekend ? ' — een SUPERWEEKEND, de aanvoerder telde 3×!' : '')+':');
+  R.push('');
+  R.push('⚡ Weekprijs: '+h.winnaars.join(' & ')+' met '+h.maxP+' ptn'+(nieuwRecordHoog?' — NIEUW SEIZOENSRECORD! 🏆':' — chapeau!'));
+  R.push('📋 Rode lantaarn: '+h.verliezers.join(' & ')+' met '+h.minP+' ptn'+(nieuwRecordLaag?' — ook dát is een nieuw (anti-)record...':'.'));
+  if(h.verrassing) R.push('😲 Verrassing van de week: '+h.verrassing.naam+' scoorde '+h.verrassing.score+' ptn — maar liefst '+h.verrassing.afwijking+' boven zijn eigen gemiddelde van '+h.verrassing.gemiddelde+'.');
+  if(h.tegenvaller) R.push('😬 Tegenvaller van de week: '+h.tegenvaller.naam+' bleef op '+h.tegenvaller.score+' ptn steken — '+Math.abs(h.tegenvaller.afwijking)+' onder zijn eigen gemiddelde van '+h.tegenvaller.gemiddelde+'.');
+  if(h.stijger) R.push('📈 Grootste stijger: '+h.stijger.naam+' klom van plek '+h.stijger.van+' naar '+h.stijger.naar+'.');
+  if(h.daler) R.push('📉 Grootste daler: '+h.daler.naam+' zakte van plek '+h.daler.van+' naar '+h.daler.naar+'.');
+  if(h.koploper) R.push('🏁 Koploper: '+h.koploper+(h.gatKop!==null ? ' — voorsprong van '+h.gatKop+' ptn op nummer 2'+(h.gatKop<=5?' (bloednerveus!)':'') : '')+'.');
+
+  if(h.besteSpeler || h.slechtsteSpeler || h.grootsteMiskleun || h.perfecteWeek.length){
+    R.push('');
+    R.push('Uit de selecties:');
+    if(h.besteSpeler) R.push('🌟 Speler van de week: '+h.besteSpeler.naam+' met '+h.besteSpeler.punten+' ptn.');
+    if(h.slechtsteSpeler && (!h.besteSpeler || h.slechtsteSpeler.naam!==h.besteSpeler.naam)) R.push('🥶 Bankzitter van de week: '+h.slechtsteSpeler.naam+' met slechts '+h.slechtsteSpeler.punten+' ptn.');
+    if(h.grootsteMiskleun) R.push('🤦 Grootste misser: '+h.grootsteMiskleun.naam+' liet '+h.grootsteMiskleun.verschil+' punten liggen door niet de ideale opstelling te kiezen.');
+    if(h.perfecteWeek.length) R.push('💯 Perfecte week: '+h.perfecteWeek.join(', ')+' koos exact de ideale opstelling!');
+  }
+
+  R.push('');
+  R.push('Bekijk alle standen op '+location.origin);
+  R.push('');
+  R.push('Groet,');
+  R.push('De organisatie');
+
+  return { onderwerp:'🎉 Weekend-highlights — speelronde '+nr, tekst:R.join('\n') };
+}
 function tplOrakel(){
   const o = data.orakel || {};
   let regel;
@@ -1376,6 +1497,7 @@ function bouwMailBericht(){
   let res;
   if(keuze==='tussenstand') res = tplTussenstand();
   else if(keuze==='ronde') res = tplRonde();
+  else if(keuze==='highlights') res = tplHighlights();
   else if(keuze==='orakel') res = tplOrakel();
   else res = { onderwerp:'', tekst:'' };
   $('mailOnderwerp').value = res.onderwerp;
