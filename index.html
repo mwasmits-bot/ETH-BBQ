@@ -5179,8 +5179,10 @@ function sbToonInlog(){
   if(velden) velden.style.display = ingelogd ? 'none' : 'flex';
   if(banner) banner.style.display = ingelogd ? 'flex' : 'none';
   if(ingelogd && $('sbIngelogdNaam')) $('sbIngelogdNaam').textContent = sbSessie;
-  if($('sbEigenBunq')) $('sbEigenBunq').style.display = ingelogd ? '' : 'none';
-  if($('sbPushBlok')) $('sbPushBlok').style.display = ingelogd ? '' : 'none';
+  // Expliciet 'flex' zetten, niet '' — een lege string wist de inline stijl weer en
+  // dan wint .sb-verborgen{display:none} alsnog (zelfde reden als de banner hierboven).
+  if($('sbEigenBunq')) $('sbEigenBunq').style.display = ingelogd ? 'flex' : 'none';
+  if($('sbPushBlok')) $('sbPushBlok').style.display = ingelogd ? 'flex' : 'none';
   if(ingelogd && typeof renderPushKnop==='function') renderPushKnop();
   if($('sbWw')) $('sbWw').value = '';   // wachtwoordtekens niet laten staan
 }
