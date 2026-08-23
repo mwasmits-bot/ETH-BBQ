@@ -596,6 +596,11 @@
         <button class="knop" id="sbBewaarEigenBunq">Opslaan</button>
         <span style="color:var(--chalk-dim);font-size:12px;flex-basis:100%">Heb je bunq? Vul je bunq.me-naam in, dan gaat uitbetalen met \u00e9\u00e9n klik. Laat je dit leeg, dan betaalt de beheerder je terug op de rekening waarvan je hebt ingelegd. Alleen jij en de beheerder kunnen dit zien.</span>
       </div>
+      <div id="sbPushBlok" class="sb-verborgen" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="knop" id="btnPushToggle">\ud83d\udd14 Herinner me 1 uur voor de eerste wedstrijd</button>
+        <span style="color:var(--chalk-dim);font-size:12px;flex-basis:100%">Krijg een pushmelding op dit toestel, 1 uur voor de aftrap van de eerste wedstrijd van elke speelronde \u2014 handig als je nog je Scorito-opstelling moet zetten. Werkt per browser/toestel; meld je je op meerdere toestellen aan, dan krijg je 'm overal.</span>
+        <div class="status" id="pushStatus"></div>
+      </div>
       <div class="status" id="sbSessieStatus"></div>
     </div>
 
@@ -5175,6 +5180,8 @@ function sbToonInlog(){
   if(banner) banner.style.display = ingelogd ? 'flex' : 'none';
   if(ingelogd && $('sbIngelogdNaam')) $('sbIngelogdNaam').textContent = sbSessie;
   if($('sbEigenBunq')) $('sbEigenBunq').style.display = ingelogd ? '' : 'none';
+  if($('sbPushBlok')) $('sbPushBlok').style.display = ingelogd ? '' : 'none';
+  if(ingelogd && typeof renderPushKnop==='function') renderPushKnop();
   if($('sbWw')) $('sbWw').value = '';   // wachtwoordtekens niet laten staan
 }
 function spelerLogin(){
@@ -5278,6 +5285,89 @@ if($('sbBewaarEigenBunq')) $('sbBewaarEigenBunq').addEventListener('click', asyn
     renderSidebets();
   }catch(e){ toonStatus('sbSessieStatus','fout', esc(e.message)); }
 });
+
+/* =============== pushmelding: opstelling-herinnering ===============
+   1 uur vóór de eerste wedstrijd van de speelronde stuurt de server (via een
+   geplande functie) een pushmelding naar iedereen die zich hier heeft aangemeld.
+   De publieke VAPID-sleutel komt van de server, zodat je 'm alleen in Netlify
+   hoeft te zetten en niet ook nog in deze broncode. */
+const PUSH_API = '/.netlify/functions/push';
+let pushRegistratie = null;
+let pushPublicKey = null;
+
+function pushOndersteund(){
+  return 'serviceWorker' in navigator && 'PushManager' in window;
+}
+function pushB64naarBytes(base64){
+  const pad = '='.repeat((4 - base64.length % 4) % 4);
+  const ruw = atob((base64 + pad).replace(/-/g,'+').replace(/_/g,'/'));
+  const out = new Uint8Array(ruw.length);
+  for(let i=0;i<ruw.length;i++) out[i] = ruw.charCodeAt(i);
+  return out;
+}
+async function pushKlaarZetten(){
+  if(!pushOndersteund()) return null;
+  try{
+    pushRegistratie = await navigator.serviceWorker.register('/sw.js');
+    if(!pushPublicKey){
+      const r = await fetch(PUSH_API, { cache:'no-store' });
+      const j = await r.json().catch(()=>({}));
+      pushPublicKey = j.publicKey || null;
+    }
+    return pushRegistratie;
+  }catch(e){ console.warn('Service worker registreren mislukt:', e); return null; }
+}
+async function pushHuidigAbonnement(){
+  if(!pushRegistratie) return null;
+  try{ return await pushRegistratie.pushManager.getSubscription(); }catch(e){ return null; }
+}
+async function pushAanmelden(){
+  if(!sbSessie){ toonStatus('sbSessieStatus','fout','Meld je eerst aan onder "Wie ben je?".'); return; }
+  if(!pushRegistratie) await pushKlaarZetten();
+  if(!pushRegistratie || !pushPublicKey){ toonStatus('pushStatus','fout','Pushmeldingen zijn nu niet beschikbaar (niet ondersteund, of de server heeft nog geen sleutel).'); return; }
+  const toestemming = await Notification.requestPermission();
+  if(toestemming !== 'granted'){ toonStatus('pushStatus','fout','Toestemming voor meldingen geweigerd — zet dit aan in je browserinstellingen om je alsnog aan te melden.'); return; }
+  try{
+    const sub = await pushRegistratie.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: pushB64naarBytes(pushPublicKey) });
+    const r = await fetch(PUSH_API, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ actie:'abonneren', deelnemer:sbSessie, wachtwoord:sbSessieWw, subscription: sub.toJSON() })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
+    toonStatus('pushStatus','info','✅ Je krijgt voortaan 1 uur voor de eerste wedstrijd een melding op dit toestel.');
+  }catch(e){ toonStatus('pushStatus','fout','Aanmelden mislukt: '+esc(e.message)); }
+  renderPushKnop();
+}
+async function pushAfmelden(){
+  try{
+    const sub = await pushHuidigAbonnement();
+    if(sub){
+      await fetch(PUSH_API, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ actie:'afmelden', deelnemer:sbSessie, wachtwoord:sbSessieWw, endpoint: sub.endpoint })
+      });
+      await sub.unsubscribe();
+    }
+    toonStatus('pushStatus','info','Uitgeschreven — je krijgt geen opstelling-herinnering meer op dit toestel.');
+  }catch(e){ toonStatus('pushStatus','fout','Afmelden mislukt: '+esc(e.message)); }
+  renderPushKnop();
+}
+async function renderPushKnop(){
+  const btn = $('btnPushToggle');
+  if(!btn) return;
+  if(!pushOndersteund()){
+    btn.textContent = 'Pushmeldingen niet ondersteund in deze browser';
+    btn.disabled = true;
+    btn.onclick = null;
+    return;
+  }
+  const sub = await pushHuidigAbonnement();
+  btn.disabled = false;
+  btn.textContent = sub ? '🔕 Uitschrijven voor opstelling-herinnering' : '🔔 Herinner me 1 uur voor de eerste wedstrijd';
+  btn.onclick = sub ? pushAfmelden : pushAanmelden;
+}
+if(pushOndersteund()) pushKlaarZetten().then(()=>{ if(sbSessie) renderPushKnop(); });
 
 if($('sbVorige')) $('sbVorige').addEventListener('click', async ()=>{
   if(sbRonde > 1){ await laadSbWedstrijden(sbRonde - 1); renderSidebets(); }
