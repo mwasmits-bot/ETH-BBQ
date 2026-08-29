@@ -312,6 +312,7 @@
     <button class="tab verborgen adm" data-doel="p-teams">Selecties</button>
     <button class="tab verborgen adm" data-doel="p-tips">Mail-tips</button>
     <button class="tab verborgen adm" data-doel="p-mail">✉️ Mailen</button>
+    <button class="tab verborgen adm" data-doel="p-push">📲 Pushmeldingen</button>
     <button class="tab verborgen adm" data-doel="p-instellingen">Instellingen</button>
   </nav>
 
@@ -876,6 +877,64 @@
     <div class="card">
       <h2>💡 Later: automatisch versturen</h2>
       <p class="uitleg">Deze mailfunctie werkt meteen, zonder extra instellingen of kosten. Wil je later e-mails <strong>volautomatisch vanuit de server</strong> laten versturen (bijvoorbeeld elke maandag de tussenstand, zonder dat je zelf iets hoeft te doen)? Dan koppelen we een mailservice zoals Resend of SendGrid via een Netlify-functie. De adressen die je nu opslaat, zijn daar al klaar voor.</p>
+    </div>
+  </section>
+
+  <!-- ============ PUSHMELDINGEN (admin) ============ -->
+  <section class="paneel" id="p-push">
+    <div class="card">
+      <h2>📲 Pushmelding versturen</h2>
+      <p class="uitleg">Stuur een pushmelding naar iedereen die zich hiervoor heeft aangemeld (via de knop bij "Wie ben je?" op het tabblad Orakel &amp; Side Bets). Kies <strong>nu direct</strong>, <strong>eenmalig op een gekozen tijdstip</strong>, of <strong>periodiek</strong> (dagelijks/wekelijks herhaald). De server checkt elke 5 minuten of er iets te versturen is, dus reken op een paar minuten marge rond het gekozen tijdstip.</p>
+
+      <div style="margin-top:10px">
+        <label for="pushTitel">Titel</label><br>
+        <input type="text" id="pushTitel" placeholder="Bijv. ⏰ Zet je opstelling!" style="width:100%;max-width:420px">
+      </div>
+      <div style="margin-top:12px">
+        <label for="pushTekst">Bericht</label><br>
+        <textarea id="pushTekst" rows="4" placeholder="Je bericht…" style="resize:vertical;width:100%;max-width:560px"></textarea>
+      </div>
+      <div style="margin-top:12px">
+        <label for="pushUrl">Link bij klikken op de melding (optioneel)</label><br>
+        <input type="text" id="pushUrl" placeholder="https://ethscoritobbq.com" style="width:100%;max-width:420px">
+      </div>
+
+      <div class="rondekop" style="margin-top:14px">
+        <div style="min-width:220px">
+          <label for="pushWanneer">Wanneer versturen</label><br>
+          <select id="pushWanneer">
+            <option value="nu">🚀 Nu direct</option>
+            <option value="gepland">🗓️ Eenmalig op een tijdstip</option>
+            <option value="periodiek">🔁 Periodiek (herhalen)</option>
+          </select>
+        </div>
+        <div id="pushTijdstipVeld" style="min-width:220px;display:none">
+          <label for="pushTijdstip">Tijdstip</label><br>
+          <input type="datetime-local" id="pushTijdstip">
+        </div>
+        <div id="pushIntervalVeld" style="min-width:160px;display:none">
+          <label for="pushInterval">Herhaal</label><br>
+          <select id="pushInterval">
+            <option value="dagelijks">Elke dag</option>
+            <option value="wekelijks">Elke week</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="knoppenrij" style="margin-top:14px">
+        <button class="actie" id="btnPushAanmaken">Versturen / inplannen</button>
+      </div>
+      <div class="status" id="pushAdminStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>🗓️ Ingeplande &amp; periodieke berichten</h2>
+      <div id="pushBerichtenLijst"></div>
+    </div>
+
+    <div class="card">
+      <h2>📜 Verzendgeschiedenis</h2>
+      <div id="pushGeschiedenisLijst"></div>
     </div>
   </section>
 
@@ -1869,7 +1928,7 @@ function renderAdminUI(){
   b.classList.toggle('ingelogd', isAdmin);
   if(!isAdmin){
     const open = document.querySelector('section.paneel.actief');
-    if(open && ['p-upload','p-teams','p-tips','p-mail','p-instellingen'].includes(open.id)) gaNaarTab('p-standen');
+    if(open && ['p-upload','p-teams','p-tips','p-mail','p-push','p-instellingen'].includes(open.id)) gaNaarTab('p-standen');
   }
 }
 $('btnAdmin').addEventListener('click', ()=>{
@@ -5370,6 +5429,129 @@ async function renderPushKnop(){
   btn.onclick = sub ? pushAfmelden : pushAanmelden;
 }
 if(pushOndersteund()) pushKlaarZetten().then(()=>{ if(sbSessie) renderPushKnop(); });
+
+/* =============== admin: handmatige pushberichten =============== */
+function pushWanneerVeldenTonen(){
+  const wanneer = $('pushWanneer').value;
+  $('pushTijdstipVeld').style.display = wanneer === 'nu' ? 'none' : 'block';
+  $('pushIntervalVeld').style.display = wanneer === 'periodiek' ? 'block' : 'none';
+}
+if($('pushWanneer')){ $('pushWanneer').addEventListener('change', pushWanneerVeldenTonen); pushWanneerVeldenTonen(); }
+
+async function pushAdminPost(payload){
+  const r = await fetch(PUSH_API, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-wachtwoord':adminWachtwoord||''},
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
+  return j;
+}
+function pushIntervalLabel(b){
+  if(b.type==='periodiek') return b.interval==='wekelijks' ? 'elke week' : 'elke dag';
+  return 'eenmalig';
+}
+function pushDatumLabel(epoch){
+  if(!epoch) return '—';
+  return new Date(epoch).toLocaleString('nl-NL', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+async function laadPushBerichten(){
+  if(!isAdmin || !adminWachtwoord) return;
+  const houderB = $('pushBerichtenLijst');
+  try{
+    const j = await pushAdminPost({ actie:'lijst' });
+    renderPushBerichten(j.berichten || [], j.geschiedenis || []);
+  }catch(e){
+    if(houderB) houderB.innerHTML = `<div class="leeg">Laden mislukt: ${esc(e.message)}</div>`;
+  }
+}
+function renderPushBerichten(berichten, geschiedenis){
+  const houderB = $('pushBerichtenLijst');
+  if(houderB){
+    houderB.innerHTML = berichten.length ? `<table class="stand" style="margin-top:4px">
+      <tr><th>Titel</th><th>Volgende keer</th><th>Herhaling</th><th>Status</th><th></th></tr>
+      ${berichten.map(b=>`<tr>
+        <td>${esc(b.titel)}</td>
+        <td>${pushDatumLabel(b.volgende)}</td>
+        <td>${pushIntervalLabel(b)}</td>
+        <td>${b.actief ? '✅ actief' : '⏸️ gepauzeerd'}</td>
+        <td style="text-align:right;white-space:nowrap">
+          ${b.type==='periodiek' ? `<button class="actie stil mini push-pauze" data-id="${esc(b.id)}" data-actief="${b.actief}">${b.actief ? 'Pauzeren' : 'Hervatten'}</button>` : ''}
+          <button class="actie gevaar mini push-weg" data-id="${esc(b.id)}">Verwijderen</button>
+        </td></tr>`).join('')}
+    </table>` : '<div class="leeg">Nog geen geplande of periodieke berichten.</div>';
+
+    houderB.querySelectorAll('.push-pauze').forEach(btn=>btn.addEventListener('click', async ()=>{
+      const actiefNu = btn.dataset.actief === 'true';
+      try{
+        await pushAdminPost({ actie: actiefNu ? 'pauzeren' : 'hervatten', id: btn.dataset.id });
+        laadPushBerichten();
+      }catch(e){ toonStatus('pushAdminStatus','fout', esc(e.message)); }
+    }));
+    houderB.querySelectorAll('.push-weg').forEach(btn=>btn.addEventListener('click', async ()=>{
+      if(!confirm('Dit bericht definitief verwijderen?')) return;
+      try{
+        await pushAdminPost({ actie:'verwijderen', id: btn.dataset.id });
+        laadPushBerichten();
+      }catch(e){ toonStatus('pushAdminStatus','fout', esc(e.message)); }
+    }));
+  }
+
+  const houderG = $('pushGeschiedenisLijst');
+  if(houderG){
+    houderG.innerHTML = geschiedenis.length ? `<table class="stand" style="margin-top:4px">
+      <tr><th>Titel</th><th>Verstuurd op</th><th>Type</th><th>Aantal ontvangers</th></tr>
+      ${geschiedenis.map(g=>`<tr>
+        <td>${esc(g.titel)}</td>
+        <td>${g.verstuurdOp ? new Date(g.verstuurdOp).toLocaleString('nl-NL') : '—'}</td>
+        <td>${g.type==='direct' ? 'direct' : g.type==='periodiek' ? 'periodiek' : 'gepland'}</td>
+        <td>${g.aantal}</td>
+      </tr>`).join('')}
+    </table>` : '<div class="leeg">Nog niets verstuurd.</div>';
+  }
+}
+if($('btnPushAanmaken')) $('btnPushAanmaken').addEventListener('click', async ()=>{
+  if(!isAdmin || !adminWachtwoord){ toonStatus('pushAdminStatus','fout','Log eerst in als admin.'); return; }
+  const titel = $('pushTitel').value.trim();
+  const tekst = $('pushTekst').value.trim();
+  const url = $('pushUrl').value.trim();
+  const wanneer = $('pushWanneer').value;
+  if(!titel || !tekst){ toonStatus('pushAdminStatus','fout','Vul een titel en een bericht in.'); return; }
+
+  let tijdstip = null;
+  if(wanneer !== 'nu'){
+    const ruw = $('pushTijdstip').value;
+    if(!ruw){ toonStatus('pushAdminStatus','fout','Kies een tijdstip.'); return; }
+    tijdstip = new Date(ruw).getTime();
+    if(!Number.isFinite(tijdstip)){ toonStatus('pushAdminStatus','fout','Ongeldig tijdstip.'); return; }
+  }
+  const interval = $('pushInterval').value;
+
+  if(wanneer==='nu' && !confirm(`Nu direct een pushmelding versturen naar alle abonnees?\n\nTitel: ${titel}`)) return;
+
+  const knop = $('btnPushAanmaken');
+  knop.disabled = true;
+  toonStatus('pushAdminStatus','info','Bezig…');
+  try{
+    const j = await pushAdminPost({ actie:'aanmaken', titel, tekst, url, wanneer, tijdstip, interval });
+    if(wanneer==='nu'){
+      toonStatus('pushAdminStatus','info', `✅ Verstuurd naar ${j.aantal} abonnee(s).`);
+    } else {
+      toonStatus('pushAdminStatus','info', `✅ Ingepland ✓ (${wanneer==='periodiek' ? 'periodiek, '+interval : 'eenmalig'})`);
+      $('pushTitel').value=''; $('pushTekst').value=''; $('pushUrl').value=''; $('pushTijdstip').value='';
+    }
+    laadPushBerichten();
+  }catch(e){
+    toonStatus('pushAdminStatus','fout','Mislukt: '+esc(e.message));
+  }finally{
+    knop.disabled = false;
+  }
+});
+{
+  const tabPush = document.querySelector('.tab[data-doel="p-push"]');
+  if(tabPush) tabPush.addEventListener('click', laadPushBerichten);
+}
 
 if($('sbVorige')) $('sbVorige').addEventListener('click', async ()=>{
   if(sbRonde > 1){ await laadSbWedstrijden(sbRonde - 1); renderSidebets(); }
