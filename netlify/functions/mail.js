@@ -147,7 +147,7 @@ export default async (req) => {
       auth: { user: "resend", pass: apiKey }
     });
 
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from: afzender,
       to: naarBcc ? antwoordAdres : geldig.join(", "),
       bcc: naarBcc ? geldig.join(", ") : undefined,
@@ -157,7 +157,19 @@ export default async (req) => {
       html: bouwHtml({ tekst, logoUrl, afzenderNaam })   // opgemaakte versie
     });
 
-    return Response.json({ ok: true, aantal: geldig.length, afzender: naarAdmin ? geldig[0] : afzenderAdres });
+    // "ok" hier betekent alleen dat Resend het bericht via SMTP heeft geaccepteerd voor
+    // verzending — geen garantie dat het ook echt is afgeleverd. Log dat verschil expliciet
+    // (zichtbaar in Netlify → Functions → mail → logs) en meld eventuele SMTP-weigeringen
+    // meteen aan de admin, in plaats van die stil te laten verdwijnen.
+    console.log("Resend-respons:", { messageId: info.messageId, response: info.response, accepted: info.accepted, rejected: info.rejected });
+
+    const rejected = info.rejected || [];
+    return Response.json({
+      ok: true,
+      aantal: geldig.length,
+      afzender: naarAdmin ? geldig[0] : afzenderAdres,
+      waarschuwing: rejected.length ? `Resend weigerde ${rejected.length} adres(sen): ${rejected.join(", ")}` : undefined
+    });
   } catch (e) {
     const melding = String(e && e.message || e);
     let vriendelijk = melding;

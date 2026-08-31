@@ -1693,7 +1693,11 @@ if($('btnMailVerstuur')) $('btnMailVerstuur').addEventListener('click', async ()
     });
     const j = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
-    toonStatus('mailStatus','info', `✅ Verstuurd naar ${j.aantal || gekozen.length} ontvanger(s) vanaf ${esc(j.afzender||'je Gmail')}. Kijk in je Verzonden-map.`);
+    if(j.waarschuwing){
+      toonStatus('mailStatus','fout', `⚠️ ${esc(j.waarschuwing)} — de rest is wel geaccepteerd. Check bij twijfel het Resend-dashboard (resend.com → Emails) voor de echte bezorgstatus.`);
+    } else {
+      toonStatus('mailStatus','info', `✅ Verstuurd naar ${j.aantal || gekozen.length} ontvanger(s) vanaf ${esc(j.afzender||'je Gmail')}. Dit betekent dat Resend het bericht heeft geaccepteerd — check bij twijfel over daadwerkelijke bezorging het Resend-dashboard (resend.com → Emails) of je spamfolder.`);
+    }
   }catch(e){
     toonStatus('mailStatus','fout','Versturen mislukt: ' + esc(e.message) + '. Werkt de mailfunctie nog niet? Gebruik dan "Open in mailprogramma".');
   }finally{
