@@ -621,9 +621,12 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <div>
           <strong>🔔 Meldingen</strong>
-          <p class="uitleg" style="margin:4px 0 0">Krijg een mailtje zodra iemand een Side Bet plaatst of aanhaakt — voor alle speelrondes, niet alleen deze.</p>
+          <p class="uitleg" style="margin:4px 0 0">Krijg een seintje zodra iemand een Side Bet plaatst of aanhaakt — voor alle speelrondes, niet alleen deze. Kies mail, pushmelding, of allebei.</p>
         </div>
-        <button class="knop" id="sbMeldingToggle">—</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="knop" id="sbMeldingToggle">—</button>
+          <button class="knop" id="sbMeldingTogglePush">—</button>
+        </div>
       </div>
       <div class="status" id="sbMeldingStatus"></div>
     </div>
@@ -4028,19 +4031,40 @@ function renderSbMelding(){
   if(!kaart) return;
   if(!sbSessie){ kaart.style.display = 'none'; return; }
   kaart.style.display = '';
-  const aan = (sbData.betAbonnees||[]).includes(sbSessie);
+  const aanMail = (sbData.betAbonnees||[]).includes(sbSessie);
   const knop = $('sbMeldingToggle');
-  knop.textContent = aan ? '🔕 Uitschrijven' : '🔔 Meld me bij nieuwe bets';
-  knop.classList.toggle('primair', !aan);
+  knop.textContent = aanMail ? '🔕 Mail uit' : '📧 Mail aan';
+  knop.classList.toggle('primair', !aanMail);
+
+  const knopPush = $('sbMeldingTogglePush');
+  if(knopPush){
+    const ondersteund = pushOndersteund();
+    const aanPush = (sbData.betAbonneesPush||[]).includes(sbSessie);
+    knopPush.textContent = !ondersteund ? '📲 Push niet ondersteund' : (aanPush ? '🔕 Push uit' : '📲 Push aan');
+    knopPush.classList.toggle('primair', ondersteund && !aanPush);
+    knopPush.disabled = !ondersteund;
+  }
 }
 if($('sbMeldingToggle')) $('sbMeldingToggle').addEventListener('click', async ()=>{
   if(!sbSessie){ toonStatus('sbMeldingStatus','fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
   const aan = (sbData.betAbonnees||[]).includes(sbSessie);
   try{
-    await sbPost({ actie:'bet-abonneren', deelnemer:sbSessie, wachtwoord:sbSessieWw, aan: !aan });
+    await sbPost({ actie:'bet-abonneren', deelnemer:sbSessie, wachtwoord:sbSessieWw, aan: !aan, kanaal:'mail' });
     renderSbMelding();
-    toonStatus('sbMeldingStatus','info', aan ? 'Uitgeschreven — je krijgt geen meldingen meer.' : '✅ Aangemeld! Je krijgt voortaan een mail als iemand een Side Bet plaatst of aanhaakt.');
+    toonStatus('sbMeldingStatus','info', aan ? 'Mail uitgeschreven — je krijgt geen mail meer.' : '✅ Aangemeld! Je krijgt voortaan een mail als iemand een Side Bet plaatst of aanhaakt.');
   }catch(e){ toonStatus('sbMeldingStatus','fout', esc(e.message)); }
+});
+if($('sbMeldingTogglePush')) $('sbMeldingTogglePush').addEventListener('click', async ()=>{
+  if(!sbSessie){ toonStatus('sbMeldingStatus','fout','Meld je eerst aan onder “Wie ben je?”.'); return; }
+  const aan = (sbData.betAbonneesPush||[]).includes(sbSessie);
+  const knop = $('sbMeldingTogglePush');
+  knop.disabled = true;
+  try{
+    if(!aan) await pushZorgVoorAbonnement();
+    await sbPost({ actie:'bet-abonneren', deelnemer:sbSessie, wachtwoord:sbSessieWw, aan: !aan, kanaal:'push' });
+    toonStatus('sbMeldingStatus','info', aan ? 'Pushmeldingen uitgeschreven — je krijgt geen pushbericht meer.' : '✅ Aangemeld! Je krijgt voortaan een pushmelding als iemand een Side Bet plaatst of aanhaakt.');
+  }catch(e){ toonStatus('sbMeldingStatus','fout', esc(e.message)); }
+  finally{ renderSbMelding(); }
 });
 
 function renderSbSaldo(){
@@ -5444,6 +5468,27 @@ async function pushAfmelden(){
     toonStatus('pushStatus','info','Uitgeschreven — je krijgt geen opstelling-herinnering meer op dit toestel.');
   }catch(e){ toonStatus('pushStatus','fout','Afmelden mislukt: '+esc(e.message)); }
   renderPushKnop();
+}
+// Zorgt dat er een actief push-abonnement is (registreert de service worker en vraagt
+// toestemming indien nodig) en meldt dat abonnement aan de server voor "bets"-meldingen —
+// los van (maar hergebruikt de browser-registratie van) de opstelling-herinnering.
+async function pushZorgVoorAbonnement(){
+  if(!pushOndersteund()) throw new Error('Pushmeldingen worden niet ondersteund in deze browser.');
+  if(!pushRegistratie) await pushKlaarZetten();
+  if(!pushRegistratie || !pushPublicKey) throw new Error('Pushmeldingen zijn nu niet beschikbaar (niet ondersteund, of de server heeft nog geen sleutel).');
+  let sub = await pushHuidigAbonnement();
+  if(!sub){
+    const toestemming = await Notification.requestPermission();
+    if(toestemming !== 'granted') throw new Error('Toestemming voor meldingen geweigerd — zet dit aan in je browserinstellingen.');
+    sub = await pushRegistratie.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: pushB64naarBytes(pushPublicKey) });
+  }
+  const r = await fetch(PUSH_API, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ actie:'abonneren', deelnemer:sbSessie, wachtwoord:sbSessieWw, subscription: sub.toJSON(), doel:'bets' })
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.fout || ('serverfout '+r.status));
+  return sub;
 }
 async function renderPushKnop(){
   const btn = $('btnPushToggle');

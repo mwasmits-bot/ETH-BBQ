@@ -8,6 +8,7 @@
 // Alle controles gebeuren serverside: een aangepaste frontend kan de regels niet omzeilen.
 import { getStore } from "@netlify/blobs";
 import { meldAdmin, meldAbonnees } from "./_notify.js";
+import { meldNamenPush } from "./_push.js";
 import { haalWedstrijd } from "./_football.js";
 
 const MAX_INZET = 100;
@@ -37,9 +38,23 @@ function bouwBetTeaserTekst({ soort, wie, tegenover, wedstrijd, bedrag, keuze })
     + `Je krijgt deze mail omdat je je hebt aangemeld voor Side Bet-meldingen. Afmelden kan met één klik in de app, bij "Per speelronde" → 🔔 Meldingen.`;
 }
 
+// Korte versie voor een pushmelding (titel + 1-2 regels) i.p.v. de lange mail-teaser.
+function bouwBetPushTekst({ soort, wie, tegenover, wedstrijd, bedrag, keuze }) {
+  if (soort === "haak") {
+    return {
+      titel: `⚔️ ${tegenover} vs ${wie}`,
+      tekst: `${tegenover} is aangehaakt bij de uitdaging van ${wie} op ${wedstrijd.thuis} - ${wedstrijd.uit}: €${bedrag} p.p. op het spel.`
+    };
+  }
+  return {
+    titel: `🔥 Nieuwe Side Bet van ${wie}`,
+    tekst: `€${bedrag} op "${KEUZE_LABEL[keuze] || keuze}" bij ${wedstrijd.thuis} - ${wedstrijd.uit}. Nog niemand tegenover — haak aan voordat iemand anders het doet.`
+  };
+}
+
 const leegSuper = () => ({ inleg: 10, potCarry: 0, wedstrijd: null, inzendingen: {}, betaald: {}, afgerond: false, winnaars: null, uitslag: null, geschiedenis: [] });
 
-const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], uitslagen: {}, betAbonnees: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
+const leegSchema = () => ({ actief: false, bunqNaam: "", uitbetaal: {}, weddenschappen: [], uitslagen: {}, betAbonnees: [], betAbonneesPush: [], seizoen: { actief: false, inleg: 20, aangemeld: {}, betaald: {}, winnaar: null }, eindstand: { actief: false, deadlineEpoch: null, inleg: 10, naamBonus: 50, kandidaten: [], voorspellingen: {}, betaald: {}, kampioen: null, laatste: null }, super: leegSuper() });
 
 function nieuwId() {
   return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -120,13 +135,18 @@ export default async (req) => {
   const bewaar = async () => { await store.set("sidebets", JSON.stringify(sb)); };
   const schoonAntwoord = (o) => { const { uitbetaal, ...p } = o; p.heeftUitbetaal = Object.keys(uitbetaal || {}); p.eindstand = eindstandPubliek(p.eindstand); p.super = superPubliek(p.super); return p; };
 
-  // Stuurt de "iemand plaatst een bet"-mail naar alle abonnees, behalve degene die
-  // de actie zelf net uitvoerde (die weet het al).
+  // Meldt "iemand plaatst een bet" aan alle abonnees (mail en/of push, per persoon
+  // gekozen), behalve degene die de actie zelf net uitvoerde (die weet het al).
   const meldBetAbonnees = async (soort, gegevens) => {
-    const namen = (sb.betAbonnees || []).filter(n => n !== gegevens.uitgesloten);
-    const emails = namen.map(n => teams[n] && teams[n].email).filter(Boolean);
-    if (!emails.length) return;
-    await meldAbonnees(emails, gegevens.onderwerp, bouwBetTeaserTekst({ soort, ...gegevens }));
+    const mailNamen = (sb.betAbonnees || []).filter(n => n !== gegevens.uitgesloten);
+    const emails = mailNamen.map(n => teams[n] && teams[n].email).filter(Boolean);
+    if (emails.length) await meldAbonnees(emails, gegevens.onderwerp, bouwBetTeaserTekst({ soort, ...gegevens }));
+
+    const pushNamen = (sb.betAbonneesPush || []).filter(n => n !== gegevens.uitgesloten);
+    if (pushNamen.length) {
+      const { titel, tekst } = bouwBetPushTekst({ soort, ...gegevens });
+      await meldNamenPush(store, pushNamen, titel, tekst);
+    }
   };
 
   try {
@@ -493,17 +513,20 @@ export default async (req) => {
       return Response.json({ ok: true, uitbetaal: eigen ? { [deelnemer]: eigen } : {} });
     }
 
-    // Aan-/afmelden voor de "iemand plaatst een bet"-mail. Geldt voor alle speelrondes,
-    // niet alleen de ronde die de deelnemer nu bekijkt.
+    // Aan-/afmelden voor de "iemand plaatst een bet"-melding, per kanaal (mail of
+    // push — een deelnemer kan beide, één van de twee, of geen van beide aan hebben
+    // staan). Geldt voor alle speelrondes, niet alleen de ronde die de deelnemer nu
+    // bekijkt.
     if (body.actie === "bet-abonneren") {
-      const { deelnemer, wachtwoord, aan } = body;
+      const { deelnemer, wachtwoord, aan, kanaal } = body;
       const fout = controleerDeelnemer(deelnemer, wachtwoord);
       if (fout) return Response.json({ fout }, { status: 401 });
       const naam = String(deelnemer || "").trim();
       if (!naam) return Response.json({ fout: "Geen deelnemer opgegeven." }, { status: 400 });
-      const set = new Set(sb.betAbonnees || []);
+      const veld = kanaal === "push" ? "betAbonneesPush" : "betAbonnees";
+      const set = new Set(sb[veld] || []);
       if (aan) set.add(naam); else set.delete(naam);
-      sb.betAbonnees = [...set];
+      sb[veld] = [...set];
       await bewaar();
       return Response.json({ ok: true, sidebets: schoonAntwoord(sb) });
     }

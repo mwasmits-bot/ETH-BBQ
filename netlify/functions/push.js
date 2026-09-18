@@ -117,7 +117,11 @@ export default async (req) => {
     return Response.json({ fout: "Geen deelnemer opgegeven." }, { status: 400 });
   }
 
-  const abonnees = (await store.get("push-abonnees", { type: "json" })) || {};
+  // "doel" kiest de opslagplek: "herinnering" (standaard, opstelling-herinnering) of
+  // "bets" (nieuwe Side Bet-meldingen) — bewust gescheiden lijsten, zodat je voor het
+  // ene kunt aanmelden zonder automatisch ook het andere te krijgen.
+  const sleutel = body.doel === "bets" ? "push-bet-abonnees" : "push-abonnees";
+  const abonnees = (await store.get(sleutel, { type: "json" })) || {};
 
   if (body.actie === "abonneren") {
     const sub = body.subscription;
@@ -127,7 +131,7 @@ export default async (req) => {
     const lijst = (abonnees[naam] || []).filter(a => a.endpoint !== sub.endpoint);
     lijst.push({ endpoint: sub.endpoint, keys: sub.keys, toegevoegdOp: new Date().toISOString() });
     abonnees[naam] = lijst;
-    await store.setJSON("push-abonnees", abonnees);
+    await store.setJSON(sleutel, abonnees);
     return Response.json({ ok: true });
   }
 
@@ -137,7 +141,7 @@ export default async (req) => {
         ? abonnees[naam].filter(a => a.endpoint !== body.endpoint)
         : [];
       if (!abonnees[naam].length) delete abonnees[naam];
-      await store.setJSON("push-abonnees", abonnees);
+      await store.setJSON(sleutel, abonnees);
     }
     return Response.json({ ok: true });
   }
