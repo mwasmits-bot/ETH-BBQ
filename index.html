@@ -172,6 +172,7 @@
   td.hoog{color:var(--amber);font-weight:700;background:var(--amber-soft);border-radius:6px}
   td.laag{color:var(--red);font-weight:700;background:var(--red-soft);border-radius:6px}
   th.telt-niet,td.telt-niet{opacity:.4;font-style:italic}
+  td.geschrapt{color:var(--chalk-dim);text-decoration:line-through;text-decoration-style:dotted;text-decoration-thickness:2px;text-underline-offset:2px}
   .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--chalk-dim)}
   .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
   .dot.a{background:var(--amber)} .dot.r{background:var(--red)}
@@ -1127,6 +1128,23 @@ function alleDeelnemers(){
   return [...s].sort((a,b)=>a.localeCompare(b,'nl'));
 }
 function rondeNummers(){ return Object.keys(data.rounds).map(Number).sort((a,b)=>a-b); }
+
+/* ---------- Scorito-schrapregel: 2 slechtste van de eerste 4 rondes tellen niet mee ----------
+   Per deelnemer (niet per ronde): zodra iemand alle eerste 4 rondes heeft gespeeld, tellen
+   zijn/haar 2 laagste resultaten daaruit niet mee voor het totaal en voor de laagste-weekscore-
+   prijs — ze blijven wel gewoon zichtbaar (doorgestreept) in de weekmatrix. */
+const EERSTE_VIER = [1,2,3,4];
+function geschraptVoorDeelnemer(naam){
+  const kand = EERSTE_VIER
+    .filter(nr => data.rounds[nr] && data.rounds[nr].scores[naam] !== undefined)
+    .map(nr => ({nr, punten: data.rounds[nr].scores[naam]}));
+  if(kand.length < EERSTE_VIER.length) return new Set(); // pas schrappen zodra alle eerste 4 rondes bekend zijn
+  kand.sort((a,b)=> a.punten - b.punten || a.nr - b.nr);
+  return new Set(kand.slice(0,2).map(k=>k.nr));
+}
+function isGeschrapteUitslag(naam, nr){
+  return nr <= 4 && geschraptVoorDeelnemer(naam).has(nr);
+}
 function unieqeSquadSpelers(){
   // unie van alle selecties: [{naam, positie}], eerste positie-vermelding wint
   const kaart = new Map();
@@ -1154,13 +1172,16 @@ function puntenVoorSpeler(nr, naam){
   const gevonden = Object.keys(lijst).find(k=>k.toLowerCase()===sleutel);
   return gevonden!==undefined ? lijst[gevonden] : undefined;
 }
-function extremen(scores){
-  const vals = Object.values(scores);
-  if(!vals.length) return {winnaars:[],verliezers:[]};
-  const max = Math.max(...vals), min = Math.min(...vals);
+function extremen(scores, nr){
+  const namen = Object.keys(scores);
+  if(!namen.length) return {winnaars:[],verliezers:[]};
+  const max = Math.max(...namen.map(n=>scores[n]));
+  const laagKandidaten = nr===undefined ? namen : namen.filter(n=>!isGeschrapteUitslag(n, nr));
+  const laagBron = laagKandidaten.length ? laagKandidaten : namen; // fallback: iedereen die ronde geschrapt (zeer onwaarschijnlijk)
+  const min = Math.min(...laagBron.map(n=>scores[n]));
   return {
-    winnaars: Object.keys(scores).filter(n=>scores[n]===max),
-    verliezers: Object.keys(scores).filter(n=>scores[n]===min)
+    winnaars: namen.filter(n=>scores[n]===max),
+    verliezers: laagBron.filter(n=>scores[n]===min)
   };
 }
 function tellingen(){
@@ -1168,30 +1189,35 @@ function tellingen(){
   rondeNummers().forEach(nr=>{
     const r = data.rounds[nr];
     if(!r.telt) return;
-    Object.entries(r.scores).forEach(([n,p])=>{ totaal[n]=(totaal[n]||0)+p; gespeeld[n]=(gespeeld[n]||0)+1; });
+    Object.entries(r.scores).forEach(([n,p])=>{
+      if(isGeschrapteUitslag(n, nr)) return;
+      totaal[n]=(totaal[n]||0)+p; gespeeld[n]=(gespeeld[n]||0)+1;
+    });
   });
   return {totaal, gespeeld};
 }
 function records(){
-  const prestaties = [];
+  const prestaties = [], prestatiesLaag = [];
   rondeNummers().forEach(nr=>{
     const r = data.rounds[nr];
     if(!r.telt) return;
-    Object.entries(r.scores).forEach(([n,p])=>prestaties.push({naam:n, punten:p, ronde:nr}));
+    Object.entries(r.scores).forEach(([n,p])=>{
+      prestaties.push({naam:n, punten:p, ronde:nr});
+      if(!isGeschrapteUitslag(n, nr)) prestatiesLaag.push({naam:n, punten:p, ronde:nr});
+    });
   });
   if(!prestaties.length) return null;
+  const laagBasis = prestatiesLaag.length ? prestatiesLaag : prestaties; // fallback: alles geschrapt (zeer onwaarschijnlijk)
   const maxP = Math.max(...prestaties.map(p=>p.punten));
-  const minP = Math.min(...prestaties.map(p=>p.punten));
+  const minP = Math.min(...laagBasis.map(p=>p.punten));
   const verloopHoog = [], verloopLaag = [];
   let besteH = -Infinity, besteL = Infinity;
-  prestaties.forEach(p=>{
-    if(p.punten > besteH){ besteH = p.punten; verloopHoog.push(p); }
-    if(p.punten < besteL){ besteL = p.punten; verloopLaag.push(p); }
-  });
+  prestaties.forEach(p=>{ if(p.punten > besteH){ besteH = p.punten; verloopHoog.push(p); } });
+  laagBasis.forEach(p=>{ if(p.punten < besteL){ besteL = p.punten; verloopLaag.push(p); } });
   return {
     prestaties,
     hoog: prestaties.filter(p=>p.punten===maxP),
-    laag: prestaties.filter(p=>p.punten===minP),
+    laag: laagBasis.filter(p=>p.punten===minP),
     verloopHoog, verloopLaag
   };
 }
@@ -1392,10 +1418,10 @@ function tplRonde(){
   const nr = laatsteRondeMetScores();
   if(nr===null) return { onderwerp:'⚡ Uitslag laatste ronde', tekst:'Er is nog geen ronde met scores ingevoerd.' };
   const scores = data.rounds[nr].scores;
-  const {winnaars, verliezers} = extremen(scores);
+  const {winnaars, verliezers} = extremen(scores, nr);
   const gesorteerd = Object.keys(scores).sort((a,b)=>scores[b]-scores[a] || a.localeCompare(b,'nl'));
   const rijen = gesorteerd.map((n,i)=>`${i+1}. ${n} — ${scores[n]} ptn`);
-  const maxP = Math.max(...Object.values(scores)), minP = Math.min(...Object.values(scores));
+  const maxP = scores[winnaars[0]], minP = scores[verliezers[0]];
   const tekst =
 `Mannen,
 
@@ -1423,8 +1449,8 @@ function highlightsRonde(nr){
   const namen = Object.keys(scores);
   if(!namen.length) return null;
 
-  const { winnaars, verliezers } = extremen(scores);
-  const maxP = Math.max(...Object.values(scores)), minP = Math.min(...Object.values(scores));
+  const { winnaars, verliezers } = extremen(scores, nr);
+  const maxP = scores[winnaars[0]], minP = scores[verliezers[0]];
 
   // Verrassing/tegenvaller: grootste afwijking t.o.v. je eigen gemiddelde tot nu toe
   // (een debuutronde heeft nog geen gemiddelde om tegen af te zetten, telt dus niet mee).
@@ -1444,7 +1470,7 @@ function highlightsRonde(nr){
   let stijger = null, daler = null, koploper = null, gatKop = null;
   if((data.rounds[nr]||{}).telt){
     const tellingRondes = rondeNummers().filter(x=>(data.rounds[x]||{}).telt);
-    const optellen = lijst => { const t={}; lijst.forEach(x=>Object.entries(data.rounds[x].scores||{}).forEach(([n,p])=>t[n]=(t[n]||0)+p)); return t; };
+    const optellen = lijst => { const t={}; lijst.forEach(x=>Object.entries(data.rounds[x].scores||{}).forEach(([n,p])=>{ if(!isGeschrapteUitslag(n,x)) t[n]=(t[n]||0)+p; })); return t; };
     const totVoor = optellen(tellingRondes.filter(x=>x<nr));
     const totNa = optellen(tellingRondes.filter(x=>x<=nr));
     const namenNa = Object.keys(totNa);
@@ -1827,7 +1853,7 @@ function renderChart(){
   const standen = [];
   nrs.forEach(nr=>{
     const r = data.rounds[nr];
-    if(r.telt) Object.entries(r.scores).forEach(([n,p])=>{ cum[n]=(cum[n]||0)+p; });
+    if(r.telt) Object.entries(r.scores).forEach(([n,p])=>{ if(!isGeschrapteUitslag(n,nr)) cum[n]=(cum[n]||0)+p; });
     const volgorde = [...namen].sort((a,b)=>(cum[b]||0)-(cum[a]||0) || a.localeCompare(b,'nl'));
     const pos = {}; let vorigePt = null, vorigePos = 0;
     volgorde.forEach((n,i)=>{
@@ -1890,7 +1916,7 @@ function renderMatrix(){
   const nrs = rondeNummers().filter(nr=>Object.keys(data.rounds[nr].scores).length);
   const namen = scoreDeelnemers();
   if(!nrs.length){ $('matrixHouder').innerHTML = '<div class="leeg">Nog geen rondes ingevoerd.</div>'; return; }
-  const ext = {}; nrs.forEach(nr => ext[nr] = extremen(data.rounds[nr].scores));
+  const ext = {}; nrs.forEach(nr => ext[nr] = extremen(data.rounds[nr].scores, nr));
   const rec = records();
   const recHoog = new Set(rec ? rec.hoog.map(p=>p.ronde+'|'+p.naam) : []);
   const recLaag = new Set(rec ? rec.laag.map(p=>p.ronde+'|'+p.naam) : []);
@@ -1907,6 +1933,7 @@ function renderMatrix(){
       const p = r.scores[n];
       if(p===undefined) return `<td class="${r.telt?'':'telt-niet'}" style="color:var(--chalk-dim)">–</td>`;
       if(!r.telt) return `<td class="telt-niet">${p}</td>`;
+      if(isGeschrapteUitslag(n, nr)) return `<td class="geschrapt" title="Eén van de 2 laagste resultaten van ${esc(n)} uit de eerste 4 rondes — telt niet mee voor het totaal of de laagste-weekscore-prijs">${p}</td>`;
       const k = ext[nr].winnaars.includes(n) ? 'hoog' : ext[nr].verliezers.includes(n) ? 'laag' : '';
       const record = recHoog.has(nr+'|'+n) ? ' ⚡' : recLaag.has(nr+'|'+n) ? ' 📋' : '';
       return `<td class="${k}">${p}${record}</td>`;
@@ -1919,8 +1946,8 @@ function renderMatrix(){
     });
   }
   $('matrixUitleg').textContent = isAdmin
-    ? 'Alle scores per speelronde. Klik op een rondenummer om die ronde te bewerken.'
-    : 'Alle scores per speelronde. Rondes met een ✕ tellen niet mee voor de prijzen.';
+    ? 'Alle scores per speelronde. Klik op een rondenummer om die ronde te bewerken. Doorgestreepte cijfers zijn voor die deelnemer 1 van de 2 laagste resultaten uit de eerste 4 rondes en tellen niet mee.'
+    : 'Alle scores per speelronde. Rondes met een ✕ tellen niet mee voor de prijzen. Doorgestreepte cijfers zijn voor die deelnemer 1 van de 2 laagste resultaten uit de eerste 4 rondes (Scorito-regel) en tellen niet mee voor het totaal of de laagste-weekscore-prijs.';
 }
 
 /* =============== admin: login & UI =============== */
