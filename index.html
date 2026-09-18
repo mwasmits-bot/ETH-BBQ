@@ -1852,11 +1852,27 @@ function renderChart(){
     houder.innerHTML = '<div class="leeg">Zodra er rondes zijn ingevoerd verschijnt hier het positieverloop.</div>';
     return;
   }
-  const cum = {}; namen.forEach(n=>cum[n]=0);
+  // Let op: de schrapregel (2 slechtste van de eerste 4 rondes) staat pas vast zodra
+  // ronde 4 gespeeld is. Voor de standen-momentopnames van ronde 1 t/m 3 tellen we dus
+  // gewoon alles ruw mee (er ís nog geen geldige schrapkeuze) — pas vanaf ronde 4 wordt
+  // met terugwerkende kracht het echte (schrapregel-)seizoenstotaal getoond. Zonder deze
+  // knip leek het net of iedereen al vanaf ronde 1 een gehalveerde score had.
   const standen = [];
   nrs.forEach(nr=>{
     const r = data.rounds[nr];
-    if(r.telt) Object.entries(r.scores).forEach(([n,p])=>{ if(!isGeschrapteUitslag(n,nr)) cum[n]=(cum[n]||0)+p; });
+    const cum = {};
+    namen.forEach(naam=>{
+      const geschrapt = nr >= 4 ? geschraptVoorDeelnemer(naam) : new Set();
+      let som = 0;
+      for(const eerdereNr of nrs){
+        if(eerdereNr > nr) break;
+        const ronde = data.rounds[eerdereNr];
+        if(!ronde.telt || geschrapt.has(eerdereNr)) continue;
+        const p = ronde.scores[naam];
+        if(p!==undefined) som += p;
+      }
+      cum[naam] = som;
+    });
     const volgorde = [...namen].sort((a,b)=>(cum[b]||0)-(cum[a]||0) || a.localeCompare(b,'nl'));
     const pos = {}; let vorigePt = null, vorigePos = 0;
     volgorde.forEach((n,i)=>{
