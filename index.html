@@ -850,13 +850,6 @@
             <option value="vrij">✍️ Vrij bericht</option>
           </select>
         </div>
-        <div style="min-width:180px">
-          <label for="mailModus">Adressering</label><br>
-          <select id="mailModus">
-            <option value="bcc">Bcc — privacy (aanrader)</option>
-            <option value="to">Aan — iedereen ziet elkaar</option>
-          </select>
-        </div>
       </div>
 
       <div style="margin-top:14px">
@@ -1619,8 +1612,7 @@ function openMailto(ontvangers){
   const onderwerp = encodeURIComponent($('mailOnderwerp').value);
   const tekst = encodeURIComponent(body);
   const lijst = ontvangers.map(o=>encodeURIComponent(o.email)).join(',');
-  const modus = ontvangers.length===1 ? 'to' : $('mailModus').value;   // één persoon → gewoon 'aan'
-  const mailto = modus==='bcc'
+  const mailto = ontvangers.length>1   // meerdere ontvangers in je eigen mailprogramma: bcc (privacy); één persoon: gewoon 'aan'
     ? `mailto:?bcc=${lijst}&subject=${onderwerp}&body=${tekst}`
     : `mailto:${lijst}?subject=${onderwerp}&body=${tekst}`;
   window.location.href = mailto;
@@ -1717,7 +1709,6 @@ if($('btnMailVerstuur')) $('btnMailVerstuur').addEventListener('click', async ()
         ontvangers: gekozen.map(g=>g.email),
         onderwerp,
         tekst: body,
-        modus: gekozen.length===1 ? 'to' : $('mailModus').value
       })
     });
     const j = await r.json().catch(()=>({}));
@@ -4507,11 +4498,12 @@ async function sbVerstuurUitslag(doelgroep, knopId){
     const r = await fetch(API_MAIL, {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'x-wachtwoord':adminWachtwoord },
-      body: JSON.stringify({ ontvangers: ontvangers.map(m=>m.email), onderwerp, tekst, modus:'bcc' })
+      body: JSON.stringify({ ontvangers: ontvangers.map(m=>m.email), onderwerp, tekst })
     });
     const j = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.fout || ('serverfout ' + r.status));
-    toonStatus('sbAdminStatus','info', '✅ Uitslag gemaild naar ' + (j.aantal || ontvangers.length) + ' ontvanger(s).');
+    if(j.waarschuwing) toonStatus('sbAdminStatus','fout', '⚠️ Uitslag gemaild naar ' + (j.aantal || 0) + ' ontvanger(s), maar: ' + esc(j.waarschuwing));
+    else toonStatus('sbAdminStatus','info', '✅ Uitslag gemaild naar ' + (j.aantal || ontvangers.length) + ' ontvanger(s).');
   }catch(e){
     toonStatus('sbAdminStatus','fout','Versturen mislukt: ' + esc(e.message));
   }finally{ knop.disabled = false; knop.textContent = orig; }

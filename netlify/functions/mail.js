@@ -1,5 +1,6 @@
-// Mail versturen vanuit de app via Resend (SMTP), met je eigen domein als afzender.
-// Nu met HTML-opmaak + logo, en platte tekst als fallback.
+// Mail versturen vanuit de app via Resend (REST-API), met je eigen domein als afzender.
+// HTML-opmaak + logo, en platte tekst als fallback. Elke ontvanger krijgt een eigen mail
+// (zie _resend.js) — geen BCC meer, dat oogde voor Gmail als bulk.
 //
 // Vereiste environment variables in Netlify:
 //   ADMIN_WACHTWOORD   — die heb je al
@@ -9,7 +10,7 @@
 //   ANTWOORD_ADRES     — jouw eigen gmail; hier komen antwoorden binnen
 //   LOGO_URL           — optioneel; standaard https://ethscoritobbq.com/eth.png
 import { getStore } from "@netlify/blobs";
-import nodemailer from "nodemailer";
+import { stuurIndividueel } from "./_resend.js";
 
 // --- Uiterlijk: pas deze drie kleuren aan als je een andere huisstijl wilt ---
 const KLEUR_BALK = "#1a2e05";   // donkere kopbalk
@@ -103,18 +104,17 @@ export default async (req) => {
 
   let body;
   try { body = await req.json(); } catch { body = null; }
-  const { ontvangers, onderwerp, tekst, modus, naarAdmin } = body || {};
+  // "modus" (bcc/aan) uit oudere frontends wordt bewust genegeerd.
+  const { ontvangers, onderwerp, tekst, naarAdmin } = body || {};
 
   if (!onderwerp || !tekst) {
     return Response.json({ fout: "Onvolledige mail (onderwerp of tekst ontbreekt)." }, { status: 400 });
   }
 
   let geldig;
-  let naarBcc;
   if (naarAdmin) {
     // Afrekening/overzicht naar de beheerder zelf — geen deelnemerscontrole nodig.
     geldig = [antwoordAdres || afzenderAdres];
-    naarBcc = false;
   } else {
     if (!Array.isArray(ontvangers) || !ontvangers.length) {
       return Response.json({ fout: "Geen ontvangers opgegeven." }, { status: 400 });
@@ -135,53 +135,39 @@ export default async (req) => {
     if (!geldig.length) {
       return Response.json({ fout: "Geen van de ontvangers staat als deelnemer in de poule." }, { status: 400 });
     }
-    naarBcc = modus !== "to" && geldig.length > 1;
   }
 
-  // --- versturen ---
+  // --- versturen: één eigen mail per ontvanger ---
   try {
-    const transport = nodemailer.createTransport({
-      host: "smtp.resend.com",
-      port: 465,
-      secure: true,
-      auth: { user: "resend", pass: apiKey }
+    const res = await stuurIndividueel({
+      apiKey,
+      van: afzender,
+      afzenderAdres,
+      antwoordAdres,
+      onderwerp,
+      tekst,                                             // fallback voor tekst-only clients
+      html: bouwHtml({ tekst, logoUrl, afzenderNaam }),  // opgemaakte versie
+      ontvangers: geldig
     });
 
-    const info = await transport.sendMail({
-      from: afzender,
-      to: naarBcc ? antwoordAdres : geldig.join(", "),
-      bcc: naarBcc ? geldig.join(", ") : undefined,
-      replyTo: antwoordAdres,
-      subject: onderwerp,
-      text: tekst,                                       // fallback voor tekst-only clients
-      html: bouwHtml({ tekst, logoUrl, afzenderNaam })   // opgemaakte versie
-    });
+    console.log("Mail verstuurd:", { via: res.via, gelukt: res.gelukt.length, mislukt: res.mislukt });
 
-    // "ok" hier betekent alleen dat Resend het bericht via SMTP heeft geaccepteerd voor
-    // verzending — geen garantie dat het ook echt is afgeleverd. Log dat verschil expliciet
-    // (zichtbaar in Netlify → Functions → mail → logs) en meld eventuele SMTP-weigeringen
-    // meteen aan de admin, in plaats van die stil te laten verdwijnen.
-    console.log("Resend-respons:", { messageId: info.messageId, response: info.response, accepted: info.accepted, rejected: info.rejected });
-
-    const rejected = info.rejected || [];
-    return Response.json({
-      ok: true,
-      aantal: geldig.length,
-      afzender: naarAdmin ? geldig[0] : afzenderAdres,
-      waarschuwing: rejected.length ? `Resend weigerde ${rejected.length} adres(sen): ${rejected.join(", ")}` : undefined
-    });
-  } catch (e) {
-    const melding = String(e && e.message || e);
-    let vriendelijk = melding;
-
-    if (/invalid login|username and password|535|authentication/i.test(melding)) {
-      vriendelijk = "Resend weigert de login. Controleer of RESEND_API_KEY klopt (begint met re_) en of de key nog actief is.";
-    } else if (/domain|not verified|403/i.test(melding)) {
-      vriendelijk = `Het domein van ${afzenderAdres} is nog niet geverifieerd in Resend.`;
-    } else if (/rate|quota|429/i.test(melding)) {
-      vriendelijk = "Daglimiet van Resend bereikt (100 mails/dag op de gratis tier). Probeer het morgen opnieuw.";
+    if (!res.gelukt.length) {
+      return Response.json({ fout: res.eersteFout || "Versturen mislukt.", mislukt: res.mislukt }, { status: 500 });
     }
 
-    return Response.json({ fout: vriendelijk }, { status: 500 });
+    const waarschuwing = res.mislukt.length
+      ? `Niet verstuurd naar ${res.mislukt.length} van ${geldig.length} adres(sen): ${res.mislukt.map(m => m.adres).join(", ")} (${res.eersteFout})`
+      : undefined;
+
+    return Response.json({
+      ok: true,
+      aantal: res.gelukt.length,
+      afzender: naarAdmin ? geldig[0] : afzenderAdres,
+      mislukt: res.mislukt,
+      waarschuwing
+    });
+  } catch (e) {
+    return Response.json({ fout: String((e && e.message) || e) }, { status: 500 });
   }
 };
