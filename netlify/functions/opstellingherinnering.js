@@ -46,7 +46,7 @@ export default async () => {
 
     if (heeftAbonnees) {
       const payload = JSON.stringify({
-        titel: "⏰ Zet je opstelling!",
+        titel: "⏰ Stel je opstelling samen!",
         tekst: `Over minder dan een uur begint ${eerste.thuis} - ${eerste.uit} — de eerste wedstrijd van speelronde ${speelronde}. Vergeet je Scorito-opstelling niet.`,
         url: "https://ethscoritobbq.com"
       });
